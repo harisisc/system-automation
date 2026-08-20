@@ -4,7 +4,6 @@ import glob
 import os
 import pathlib
 import readline
-import subprocess
 import sys
 
 
@@ -42,17 +41,6 @@ def read_value(name: str) -> str:
     return ""
 
 
-def hash_password(password: str) -> str:
-    result = subprocess.run(
-        ["openssl", "passwd", "-6", "-stdin"],
-        input=password,
-        capture_output=True,
-        text=True,
-        check=True,
-    )
-    return result.stdout.strip()
-
-
 def prompt_matching(prompt: str) -> str:
     while True:
         first = getpass.getpass(f"{prompt}: ")
@@ -64,10 +52,6 @@ def prompt_matching(prompt: str) -> str:
 
 def prompt_luks_password() -> str:
     return prompt_matching("LUKS disk encryption passphrase")
-
-
-def prompt_install_password_hash() -> str:
-    return hash_password(prompt_matching("Install-time user password"))
 
 
 PUBLIC_KEY_PREFIXES = (
@@ -111,7 +95,6 @@ def prompt_ssh_public_key() -> str:
 
 PROMPTS = {
     "__ANSIBLE_SSH_PUBLIC_KEY__": prompt_ssh_public_key,
-    "__INSTALL_PASSWORD_HASH__": prompt_install_password_hash,
     "__LUKS_PASSWORD__": prompt_luks_password,
 }
 
@@ -124,7 +107,6 @@ def main() -> int:
 
     values = {
         "__ANSIBLE_SSH_PUBLIC_KEY__": read_value("ANSIBLE_SSH_PUBLIC_KEY"),
-        "__INSTALL_PASSWORD_HASH__": read_value("INSTALL_PASSWORD_HASH"),
         "__LUKS_PASSWORD__": read_value("LUKS_PASSWORD"),
     }
 

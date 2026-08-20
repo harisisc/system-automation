@@ -4,7 +4,9 @@ Generates an Ubuntu `autoinstall.yaml` from
 [`autoinstall.yaml.template`](autoinstall.yaml.template) for unattended OS
 installs. The template creates an `ansible` user during installation
 (key-only SSH auth, passwordless sudo) so `../ansible` has something to
-connect to once the machine boots.
+connect to once the machine boots. The install-time `ubuntu` user is
+password-locked (`password: "!"`) — it's not meant to be logged into;
+`../ansible` creates your real accounts afterward.
 
 Run `make help` (or just `make`) to list available targets.
 
@@ -15,30 +17,25 @@ make autoinstall
 ```
 
 Run interactively (a real terminal, not a script/CI), it prompts for
-whatever's missing: install-time password (hashed for you — see below),
-LUKS passphrase, and the Ansible SSH public key path (defaults to
-`~/.ssh/ansible_ed25519.pub`, just press enter to accept it). Passwords are
-entered twice and hidden as you type.
+whatever's missing: LUKS passphrase, and the Ansible SSH public key path
+(defaults to `~/.ssh/ansible_ed25519.pub`, just press enter to accept it).
+The passphrase is entered twice and hidden as you type.
 
-To skip prompts (CI, scripting, or just to avoid typing it twice), pass
+To skip the prompt (CI, scripting, or just to avoid typing it twice), pass
 values as env vars instead — this fails fast on whatever's missing rather
 than prompting:
 
 ```sh
-INSTALL_PASSWORD_HASH='your-sha512-password-hash' \
 LUKS_PASSWORD='your-disk-password' \
 make autoinstall
 ```
 
-`INSTALL_PASSWORD_HASH` must already be a SHA-512 crypt hash in this
-non-interactive form (e.g. from `mkpasswd --method=sha-512`) — the
-prompt-and-hash convenience only applies when you're typing it in
-interactively. `LUKS_PASSWORD` is always the plaintext passphrase, not a
-hash. All three (including the SSH key, via `ANSIBLE_SSH_PUBLIC_KEY` /
-`ANSIBLE_SSH_PUBLIC_KEY_FILE`) accept a `_FILE` suffix if you'd rather not
-put secrets on the command line or in shell history — non-interactive runs
-don't get the `~/.ssh/ansible_ed25519.pub` default, so pass it explicitly
-if it's not that path.
+`LUKS_PASSWORD` is always the plaintext passphrase, not a hash. Both it and
+the SSH key (via `ANSIBLE_SSH_PUBLIC_KEY` / `ANSIBLE_SSH_PUBLIC_KEY_FILE`)
+accept a `_FILE` suffix if you'd rather not put secrets on the command line
+or in shell history — non-interactive runs don't get the
+`~/.ssh/ansible_ed25519.pub` default, so pass it explicitly if it's not
+that path.
 
 This writes `build/autoinstall.yaml` (the whole `build/` directory is
 gitignored — it contains local credentials and generated binaries).
@@ -55,9 +52,9 @@ SOURCE_ISO=~/Downloads/ubuntu-24.04.1-live-server-amd64.iso make iso
 ```
 
 `make iso` runs `make autoinstall` first, so the same interactive prompting
-applies — or pass `INSTALL_PASSWORD_HASH`/`LUKS_PASSWORD` to skip it, same as
-above. If `SOURCE_ISO` is omitted, `build_iso.sh` prompts for the path too;
-in a non-interactive shell it exits with an error instead of guessing.
+applies — or pass `LUKS_PASSWORD` to skip it, same as above. If `SOURCE_ISO`
+is omitted, `build_iso.sh` prompts for the path too; in a non-interactive
+shell it exits with an error instead of guessing.
 
 This runs `make autoinstall` first, then `scripts/build_iso.sh`, which:
 
