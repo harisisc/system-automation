@@ -34,8 +34,11 @@ make autoinstall
 non-interactive form (e.g. from `mkpasswd --method=sha-512`) — the
 prompt-and-hash convenience only applies when you're typing it in
 interactively. `LUKS_PASSWORD` is always the plaintext passphrase, not a
-hash. Both accept a `_FILE` suffix (e.g. `LUKS_PASSWORD_FILE=/path`) if you'd
-rather not put secrets on the command line or in shell history.
+hash. All three (including the SSH key, via `ANSIBLE_SSH_PUBLIC_KEY` /
+`ANSIBLE_SSH_PUBLIC_KEY_FILE`) accept a `_FILE` suffix if you'd rather not
+put secrets on the command line or in shell history — non-interactive runs
+don't get the `~/.ssh/ansible_ed25519.pub` default, so pass it explicitly
+if it's not that path.
 
 This writes `build/autoinstall.yaml` (the whole `build/` directory is
 gitignored — it contains local credentials and generated binaries).

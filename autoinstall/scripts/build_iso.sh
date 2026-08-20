@@ -33,7 +33,7 @@ done
 
 if [ -z "$SOURCE_ISO" ]; then
     if [ -t 0 ]; then
-        read -r -p "Path to base Ubuntu live-server ISO: " SOURCE_ISO
+        read -e -r -p "Path to base Ubuntu live-server ISO: " SOURCE_ISO
     fi
     if [ -z "$SOURCE_ISO" ]; then
         echo "SOURCE_ISO is required (base Ubuntu live-server ISO)." >&2
