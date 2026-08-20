@@ -1,0 +1,9 @@
+---
+- name: Install Syncthing package
+  ansible.builtin.apt:
+    name:
+      - syncthing
+      - python3-lxml
+    state: present
+    update_cache: true
+  become: true

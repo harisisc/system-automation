@@ -1,0 +1,63 @@
+- hosts: workstations
+  become: true
+  # roles:
+  #   - base
+  #   - rtcwake
+  #   - snap_packages
+  #   - syncthing
+  #   - geerlingguy.docker
+  #   - docker
+  #   - preferences
+  
+  tasks:
+    # Base software and user creation
+    - name: Create configured users
+      ansible.builtin.user:
+        name: "{{ item.username }}"
+        state: present
+        system: false
+        shell: /bin/bash
+        create_home: true
+        groups:
+          - sudo
+        append: true
+        password: "{{ item.password_hash | default(omit) }}"
+      loop: "{{ users | default([]) }}"
+
+    - name: Remove default Ubuntu installer user
+      ansible.builtin.user:
+        name: ubuntu
+        state: absent
+        remove: true
+        force: true
+      when: "'ubuntu' not in users | default([]) | map(attribute='username') | list"
+
+    - name: Remove default Ubuntu installer group
+      ansible.builtin.group:
+        name: ubuntu
+        state: absent
+      when: "'ubuntu' not in users | default([]) | map(attribute='username') | list"
+
+    - name: Install base apt packages
+      ansible.builtin.include_role:
+        name: base
+    - name: Install base snap packages
+      ansible.builtin.include_role:
+        name: snap_packages
+    
+    # Data Sync (rtcwake and syncthing)
+    - name: Install and configure rtcwake
+      ansible.builtin.include_role:
+        name: rtcwake
+    - name: Install and configure Syncthing
+      ansible.builtin.include_role:
+        name: syncthing
+      loop: "{{ users | default([]) | selectattr('syncthing', 'defined') | list }}"
+      loop_control:
+        loop_var: syncthing_user_config
+      vars:
+        syncthing_user: "{{ syncthing_user_config.username }}"
+        syncthing_port: "{{ syncthing_user_config.syncthing.port }}"
+        syncthing_directory: "{{ syncthing_user_config.syncthing.directory }}"
+
+        

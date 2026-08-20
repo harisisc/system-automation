@@ -1,0 +1,7 @@
+# requirements.yaml
+
+# ansible-galaxy collection install -r collections/requirements.yaml -p ./collections
+
+collections:
+  - name: artis3n.tailscale
+  - name: community.general

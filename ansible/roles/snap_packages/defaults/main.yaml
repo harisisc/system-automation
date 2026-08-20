@@ -1,0 +1,7 @@
+---
+workstation_snap_packages:
+  - name: chromium
+  - name: signal-desktop
+  - name: zoom-client
+  - name: codium
+    classic: true

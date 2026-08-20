@@ -1,0 +1,77 @@
+---
+- name: Stop Syncthing before changing config
+  ansible.builtin.systemd:
+    name: syncthing@{{ syncthing_user }}
+    state: stopped
+  become: true
+  failed_when: false
+
+- name: Ensure Syncthing config directory exists
+  ansible.builtin.file:
+    path: /home/{{ syncthing_user }}/.local/state/syncthing
+    state: directory
+    owner: "{{ syncthing_user }}"
+    group: "{{ syncthing_user }}"
+    mode: "0700"
+  become: true
+
+- name: Generate Syncthing config
+  ansible.builtin.command:
+    cmd: syncthing generate --home=/home/{{ syncthing_user }}/.local/state/syncthing
+    creates: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
+  become: true
+  become_user: "{{ syncthing_user }}"
+
+- name: Ensure configured Syncthing directory exists
+  ansible.builtin.file:
+    path: "{{ syncthing_directory }}"
+    state: directory
+    owner: "{{ syncthing_user }}"
+    group: "{{ syncthing_user }}"
+    mode: "0750"
+  become: true
+
+- name: Configure Syncthing GUI port
+  community.general.xml:
+    path: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
+    xpath: /configuration/gui/address
+    value: "127.0.0.1:{{ syncthing_port }}"
+  become: true
+
+- name: Configure Syncthing GUI HTTPS
+  community.general.xml:
+    path: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
+    xpath: /configuration/gui
+    attribute: tls
+    value: "true"
+  become: true
+
+- name: Configure Syncthing device name
+  community.general.xml:
+    path: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
+    xpath: /configuration/device[1]
+    attribute: name
+    value: "{{ ansible_hostname }}-{{ syncthing_user }}"
+  become: true
+
+- name: Configure Syncthing folder directory
+  community.general.xml:
+    path: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
+    xpath: /configuration/folder[@id='default']/path
+    value: "{{ syncthing_directory }}"
+  become: true
+
+- name: Remove Syncthing default Sync directory
+  ansible.builtin.file:
+    path: /home/{{ syncthing_user }}/Sync
+    state: absent
+  become: true
+
+- name: Ensure Syncthing config ownership
+  ansible.builtin.file:
+    path: /home/{{ syncthing_user }}/.local/state/syncthing
+    state: directory
+    owner: "{{ syncthing_user }}"
+    group: "{{ syncthing_user }}"
+    recurse: true
+  become: true

@@ -1,0 +1,13 @@
+---
+base_apt_packages:
+  - ca-certificates
+  - curl
+  - iputils-ping
+  - net-tools
+  - netcat-openbsd
+  - telnet
+  - git
+  - vim
+  - ansible
+  - openssh-server
+  - jq

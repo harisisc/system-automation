@@ -1,0 +1,22 @@
+---
+- name: Update software (apt, snap, and flatpak)
+  hosts: all
+  become: true
+  
+  tasks:
+  - name: Update apt cache and upgrade packages
+    ansible.builtin.apt:
+      update_cache: true
+      cache_valid_time: 3600
+      upgrade: yes
+
+  - name: Gather package facts
+    ansible.builtin.package_facts:
+
+  - name: Refresh all snap packages
+    ansible.builtin.command: snap refresh
+    when: "'snapd' in ansible_facts.packages"
+
+  - name: Refresh all flatpak packages
+    ansible.builtin.command: flatpak update -y
+    when: "'flatpak' in ansible_facts.packages"

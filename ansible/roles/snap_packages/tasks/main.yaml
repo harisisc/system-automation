@@ -1,0 +1,19 @@
+---
+- name: Ensure snapd is enabled and running
+  systemd:
+    name: snapd
+    enabled: true
+    state: started
+
+- name: Check installed snaps
+  command: "snap list {{ item.name }}"
+  register: workstation_snap_packages_snap_check
+  failed_when: false
+  changed_when: false
+  loop: "{{ workstation_snap_packages }}"
+
+- name: Install missing snaps
+  command: >-
+    snap install {{ item.item.name }}{% if item.item.classic | default(false) %} --classic{% endif %}
+  loop: "{{ workstation_snap_packages_snap_check.results }}"
+  when: item.rc != 0

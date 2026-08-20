@@ -1,0 +1,17 @@
+---
+- name: Require Syncthing user
+  ansible.builtin.assert:
+    that:
+      - syncthing_user | length > 0
+      - syncthing_port | string | length > 0
+      - syncthing_directory | length > 0
+    fail_msg: Set syncthing_user, syncthing_port, and syncthing_directory when including the syncthing role.
+
+- name: Install Syncthing
+  ansible.builtin.import_tasks: install.yaml
+
+- name: Configure Syncthing
+  ansible.builtin.import_tasks: config.yaml
+
+- name: Configure Syncthing services
+  ansible.builtin.import_tasks: service.yaml

@@ -1,0 +1,26 @@
+---
+  - name: Ensure vim is installed
+    ansible.builtin.package:
+      name: vim
+      state: present
+
+  - name: Set default editor to vim
+    ansible.builtin.alternatives:
+      name: editor
+      path: /usr/bin/vim.basic
+  
+  - name: Set EDITOR environment globally
+    ansible.builtin.copy:
+      dest: /etc/profile.d/editor.sh
+      content: |
+        export EDITOR=vim
+        export VISUAL=vim
+      mode: '0644'
+
+  - name: Deploy gitconfig
+    template:
+      src: gitconfig.j2
+      dest: "/home/{{ user }}/.gitconfig"
+      owner: "{{ user }}"
+      group: "{{ user }}"
+      mode: "0644"

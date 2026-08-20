@@ -1,0 +1,37 @@
+---
+- name: Ensure util-linux is installed (rtcwake)
+  ansible.builtin.package:
+    name: util-linux
+    state: present
+
+- name: Install wake script
+  ansible.builtin.template:
+    src: set-wake.sh.j2
+    dest: /usr/local/bin/set-wake.sh
+    owner: root
+    group: root
+    mode: '0755'
+  become: true
+  register: service_file
+
+- name: Install systemd service
+  ansible.builtin.template:
+    src: set-wake.service.j2
+    dest: /etc/systemd/system/set-wake.service
+    owner: root
+    group: root
+    mode: '0644'
+  become: true
+  when: service_file.changed
+
+- name: Reload systemd daemon
+  ansible.builtin.systemd:
+    daemon_reload: true
+  become: true
+
+- name: Enable wake service
+  ansible.builtin.systemd:
+    name: set-wake.service
+    enabled: true
+    state: started
+  become: true

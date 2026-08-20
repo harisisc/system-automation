@@ -1,0 +1,11 @@
+#!/usr/bin/env bash
+
+TARGET=$(date -d '20:00' +%s)
+NOW=$(date +%s)
+
+# If past 20:00, schedule tomorrow
+if [ "$NOW" -gt "$TARGET" ]; then
+  TARGET=$(date -d 'tomorrow 20:00' +%s)
+fi
+
+/usr/sbin/rtcwake -m no -u -t "$TARGET"

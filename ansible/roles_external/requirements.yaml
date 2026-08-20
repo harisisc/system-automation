@@ -1,0 +1,6 @@
+# requirements.yml
+
+# ansible-galaxy role install -r roles_external/requirements.yml -p ./roles_external
+
+roles:
+  - name: geerlingguy.docker

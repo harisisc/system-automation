@@ -1,0 +1,19 @@
+# Ansible runtime
+*.retry
+
+# Vault password - never commit this, it decrypts every secret in the repo.
+.vault_pass
+
+# Local inventory overrides
+inventory/*
+
+# external installs
+collections/*
+
+!collections/
+!collections/requirements.yaml
+
+roles_external/*
+
+!roles_external/
+!roles_external/requirements.yaml

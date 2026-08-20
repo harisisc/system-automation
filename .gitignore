@@ -1,0 +1,9 @@
+# secrets
+*.vault
+*.key
+*.pem
+.env
+*.env
+
+__pycache__/
+*.pyc
