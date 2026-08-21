@@ -26,7 +26,7 @@ autoinstall:
       name: lvm
       # Fixed for now - same passphrase on every install. Change it after
       # first boot with cryptsetup luksChangeKey (see README).
-      password: "changeme-luks-passphrase"
+      password: "changeme"
 
   packages:
     - openssh-server

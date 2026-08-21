@@ -9,9 +9,9 @@ password-locked (`password: "!"`) — it's not meant to be logged into;
 `../ansible` creates your real accounts afterward.
 
 The LUKS disk-encryption passphrase is currently a fixed value hardcoded
-in the template (`changeme-luks-passphrase`) — the same on every install.
-Change it after first boot (see below); rotating this to something
-per-machine and not sitting in a file is a follow-up, not done yet.
+in the template (`changeme`) — the same on every install. Change it after
+first boot (see below); rotating this to something per-machine and not
+sitting in a file is a follow-up, not done yet.
 
 Run `make help` (or just `make`) to list available targets.
 
@@ -97,8 +97,8 @@ make clean
 ## Update a LUKS Passphrase
 
 Do this on every machine after first boot — the passphrase baked into the
-template (`changeme-luks-passphrase`) is the same on every install and
-isn't meant to be kept.
+template (`changeme`) is the same on every install and isn't meant to be
+kept.
 
 Find the encrypted partition. Look for `crypto_LUKS` in the filesystem type
 column:
