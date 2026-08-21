@@ -7,17 +7,15 @@ BUILD_DIR ?= build
 AUTOINSTALL_TEMPLATE ?= autoinstall.yaml.template
 AUTOINSTALL_OUTPUT ?= $(BUILD_DIR)/autoinstall.yaml
 ANSIBLE_SSH_PUBLIC_KEY_FILE ?=
-LUKS_PASSWORD_FILE ?=
 
 SOURCE_ISO ?=
 OUTPUT_ISO ?= $(BUILD_DIR)/ubuntu-autoinstall.iso
 VOLUME_ID ?= ubuntu-autoinstall
 
-autoinstall: ## Render build/autoinstall.yaml from the template (needs LUKS_PASSWORD)
+autoinstall: ## Render build/autoinstall.yaml from the template
 	@AUTOINSTALL_TEMPLATE="$(AUTOINSTALL_TEMPLATE)" \
 	AUTOINSTALL_OUTPUT="$(AUTOINSTALL_OUTPUT)" \
 	ANSIBLE_SSH_PUBLIC_KEY_FILE="$(ANSIBLE_SSH_PUBLIC_KEY_FILE)" \
-	LUKS_PASSWORD_FILE="$(LUKS_PASSWORD_FILE)" \
 	python3 scripts/render_autoinstall.py
 
 iso: autoinstall ## Build build/ubuntu-autoinstall.iso from SOURCE_ISO + the rendered autoinstall.yaml

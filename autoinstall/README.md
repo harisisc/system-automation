@@ -8,6 +8,11 @@ connect to once the machine boots. The install-time `ubuntu` user is
 password-locked (`password: "!"`) — it's not meant to be logged into;
 `../ansible` creates your real accounts afterward.
 
+The LUKS disk-encryption passphrase is currently a fixed value hardcoded
+in the template (`changeme-luks-passphrase`) — the same on every install.
+Change it after first boot (see below); rotating this to something
+per-machine and not sitting in a file is a follow-up, not done yet.
+
 Run `make help` (or just `make`) to list available targets.
 
 ## Generate an installer config
@@ -16,26 +21,20 @@ Run `make help` (or just `make`) to list available targets.
 make autoinstall
 ```
 
-Run interactively (a real terminal, not a script/CI), it prompts for
-whatever's missing: LUKS passphrase, and the Ansible SSH public key path
-(defaults to `~/.ssh/ansible_ed25519.pub`, just press enter to accept it).
-The passphrase is entered twice and hidden as you type.
+Run interactively (a real terminal, not a script/CI), it prompts for the
+Ansible SSH public key path if it's not already resolvable (defaults to
+`~/.ssh/ansible_ed25519.pub`, just press enter to accept it).
 
-To skip the prompt (CI, scripting, or just to avoid typing it twice), pass
-values as env vars instead — this fails fast on whatever's missing rather
-than prompting:
+To skip the prompt (CI, scripting), pass it as an env var instead — this
+fails fast rather than prompting if it's still missing:
 
 ```sh
-LUKS_PASSWORD='your-disk-password' \
-make autoinstall
+ANSIBLE_SSH_PUBLIC_KEY_FILE=~/.ssh/ansible_ed25519.pub make autoinstall
 ```
 
-`LUKS_PASSWORD` is always the plaintext passphrase, not a hash. Both it and
-the SSH key (via `ANSIBLE_SSH_PUBLIC_KEY` / `ANSIBLE_SSH_PUBLIC_KEY_FILE`)
-accept a `_FILE` suffix if you'd rather not put secrets on the command line
-or in shell history — non-interactive runs don't get the
-`~/.ssh/ansible_ed25519.pub` default, so pass it explicitly if it's not
-that path.
+`ANSIBLE_SSH_PUBLIC_KEY` / `ANSIBLE_SSH_PUBLIC_KEY_FILE` — non-interactive
+runs don't get the `~/.ssh/ansible_ed25519.pub` default, so pass one
+explicitly if it's not that path.
 
 This writes `build/autoinstall.yaml` (the whole `build/` directory is
 gitignored — it contains local credentials and generated binaries).
@@ -52,9 +51,9 @@ SOURCE_ISO=~/Downloads/ubuntu-24.04.1-live-server-amd64.iso make iso
 ```
 
 `make iso` runs `make autoinstall` first, so the same interactive prompting
-applies — or pass `LUKS_PASSWORD` to skip it, same as above. If `SOURCE_ISO`
-is omitted, `build_iso.sh` prompts for the path too; in a non-interactive
-shell it exits with an error instead of guessing.
+applies. If `SOURCE_ISO` is omitted, `build_iso.sh` prompts for the path
+too; in a non-interactive shell it exits with an error instead of
+guessing.
 
 This runs `make autoinstall` first, then `scripts/build_iso.sh`, which:
 
@@ -96,6 +95,10 @@ make clean
 ```
 
 ## Update a LUKS Passphrase
+
+Do this on every machine after first boot — the passphrase baked into the
+template (`changeme-luks-passphrase`) is the same on every install and
+isn't meant to be kept.
 
 Find the encrypted partition. Look for `crypto_LUKS` in the filesystem type
 column:

@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-import getpass
 import glob
 import os
 import pathlib
@@ -39,19 +38,6 @@ def read_value(name: str) -> str:
             return ""
 
     return ""
-
-
-def prompt_matching(prompt: str) -> str:
-    while True:
-        first = getpass.getpass(f"{prompt}: ")
-        second = getpass.getpass("Confirm: ")
-        if first and first == second:
-            return first
-        print("Empty or mismatched input, try again.", file=sys.stderr)
-
-
-def prompt_luks_password() -> str:
-    return prompt_matching("LUKS disk encryption passphrase")
 
 
 PUBLIC_KEY_PREFIXES = (
@@ -95,7 +81,6 @@ def prompt_ssh_public_key() -> str:
 
 PROMPTS = {
     "__ANSIBLE_SSH_PUBLIC_KEY__": prompt_ssh_public_key,
-    "__LUKS_PASSWORD__": prompt_luks_password,
 }
 
 
@@ -107,7 +92,6 @@ def main() -> int:
 
     values = {
         "__ANSIBLE_SSH_PUBLIC_KEY__": read_value("ANSIBLE_SSH_PUBLIC_KEY"),
-        "__LUKS_PASSWORD__": read_value("LUKS_PASSWORD"),
     }
 
     # Only prompt when attached to a real terminal, so non-interactive runs
