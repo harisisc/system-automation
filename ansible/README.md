@@ -10,6 +10,21 @@ ansible-galaxy role install -r roles_external/requirements.yaml -p ./roles_exter
 ansible-galaxy collection install -r collections/requirements.yaml -p ./collections
 ```
 
+## Inventory
+
+`inventory/hosts.yaml` has two groups, reflecting a machine's lifecycle:
+
+- **`bootstrap`** — freshly autoinstalled machines, reachable only by IP,
+  still with the template's default hostname and no Tailscale. This is
+  what a future hostname + Tailscale playbook targets.
+- **`workstations`** — fully set up machines (real hostname, Tailscale
+  connected), identified by hostname instead of IP. `provision.yaml`,
+  `update.yaml`, and `site.yaml` all target this group, not `bootstrap`.
+
+Once the hostname/Tailscale playbook has run against a `bootstrap` entry,
+move it by hand: delete its IP-keyed line from `bootstrap.hosts` and add a
+hostname-keyed line under `workstations.hosts` instead.
+
 ## Configure Login Passwords
 
 `password_hash` values in `inventory/group_vars/all.yaml` are encrypted
