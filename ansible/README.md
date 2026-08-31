@@ -42,6 +42,25 @@ and each account is forced to change it at first login (`passwd --expire`),
 so it only needs to work long enough for someone to log in once and set
 their own. Nothing about a user's real password ever lives in this repo.
 
+### Connect to Tailscale
+
+Tailscale itself is installed but left unauthenticated. Generate an auth
+key from the [admin console](https://login.tailscale.com/admin/settings/keys) →
+**Generate auth key...**, with:
+
+- **Reusable** — off (single-use only)
+- **Ephemeral** — off (the machine stays listed when offline, instead of
+  being removed from your tailnet automatically)
+- **Pre-approved** — on, if shown (skips manual device approval; only
+  appears if device approval is enabled on your tailnet)
+- **Expiration** — 90 days
+
+Then, on the machine itself:
+
+```sh
+sudo tailscale up --accept-routes --auth-key=tskey-auth-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
 ## Secrets (ansible-vault)
 
 Nothing in the repo is currently vaulted (user passwords are handled
