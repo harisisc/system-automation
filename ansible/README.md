@@ -42,14 +42,47 @@ it interactively.
 
 ## Run Playbooks
 
-Run the full workstation setup:
+`playbooks/site.yaml` builds an entire machine: `update.yaml` (apt/snap/flatpak
+upgrades — the thing you'd run regularly, e.g. on a cron/timer) then
+`provision.yaml` (users, packages, Docker, Syncthing, preferences — the
+thing you mostly only need after a fresh install).
+
+Run the full build:
 
 ```sh
 ansible-playbook playbooks/site.yaml --vault-password-file .vault_pass
 ```
 
-Run only the desktop setup:
+Run just the regular maintenance pass:
 
 ```sh
-ansible-playbook playbooks/desktop.yaml --vault-password-file .vault_pass
+ansible-playbook playbooks/update.yaml --vault-password-file .vault_pass
+```
+
+Run just provisioning:
+
+```sh
+ansible-playbook playbooks/provision.yaml --vault-password-file .vault_pass
+```
+
+`provision.yaml`'s tasks are tagged by concern (`users`, `base`,
+`snap_packages`, `docker`, `rtcwake`, `syncthing`, `preferences`), so you
+can run a slice of it without touching the rest — e.g. to pick up a new
+user you just added to `group_vars/all.yaml` without re-running everything
+else:
+
+```sh
+ansible-playbook playbooks/provision.yaml --vault-password-file .vault_pass --tags users
+```
+
+Or the inverse, everything except Docker:
+
+```sh
+ansible-playbook playbooks/provision.yaml --vault-password-file .vault_pass --skip-tags docker
+```
+
+For anything not covered by a tag, `run_role.yaml` runs one role standalone:
+
+```sh
+ansible-playbook playbooks/run_role.yaml --vault-password-file .vault_pass -e role_name=syncthing
 ```

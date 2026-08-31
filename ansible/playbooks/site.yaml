@@ -1,4 +1,4 @@
 ---
 # site.yaml
 - import_playbook: update.yaml
-- import_playbook: desktop.yaml
+- import_playbook: provision.yaml
