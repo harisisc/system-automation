@@ -1,14 +1,6 @@
 - hosts: workstations
   become: true
-  # roles:
-  #   - base
-  #   - rtcwake
-  #   - snap_packages
-  #   - syncthing
-  #   - geerlingguy.docker
-  #   - docker
-  #   - preferences
-  
+
   tasks:
     # Base software and user creation
     - name: Create configured users
@@ -44,7 +36,15 @@
     - name: Install base snap packages
       ansible.builtin.include_role:
         name: snap_packages
-    
+
+    # Docker (install engine, then add configured users to the docker group)
+    - name: Install Docker
+      ansible.builtin.include_role:
+        name: geerlingguy.docker
+    - name: Add users to the docker group
+      ansible.builtin.include_role:
+        name: docker
+
     # Data Sync (rtcwake and syncthing)
     - name: Install and configure rtcwake
       ansible.builtin.include_role:
@@ -60,4 +60,14 @@
         syncthing_port: "{{ syncthing_user_config.syncthing.port }}"
         syncthing_directory: "{{ syncthing_user_config.syncthing.directory }}"
 
-        
+    # Per-user preferences (editor, gitconfig)
+    - name: Configure user preferences
+      ansible.builtin.include_role:
+        name: preferences
+      loop: "{{ users | default([]) | selectattr('git', 'defined') | list }}"
+      loop_control:
+        loop_var: preferences_user_config
+      vars:
+        user: "{{ preferences_user_config.username }}"
+        git_user_name: "{{ preferences_user_config.git.user_name }}"
+        git_user_email: "{{ preferences_user_config.git.user_email }}"

@@ -1,12 +1,10 @@
 ---
 - name: Enable user lingering for Syncthing user
   ansible.builtin.command: loginctl enable-linger {{ syncthing_user }}
-  become: true
   changed_when: false
-  
+
 - name: Enable Syncthing user service
   ansible.builtin.systemd:
     name: syncthing@{{ syncthing_user }}
     enabled: true
     state: started
-  become: true

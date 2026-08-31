@@ -1,12 +1,12 @@
 ---
 - name: Require Ubuntu hosts for this role
-  assert:
+  ansible.builtin.assert:
     that:
       - ansible_distribution == "Ubuntu"
     fail_msg: "This role currently supports Ubuntu only."
 
 - name: Install KVM, QEMU, and GNOME Boxes packages
-  apt:
+  ansible.builtin.apt:
     name: "{{ kvmhosts_packages }}"
     state: present
     update_cache: true

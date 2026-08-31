@@ -1,5 +1,5 @@
 ---
-workstation_snap_packages:
+snap_packages_list:
   - name: chromium
   - name: signal-desktop
   - name: zoom-client

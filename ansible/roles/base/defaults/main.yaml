@@ -8,6 +8,5 @@ base_apt_packages:
   - telnet
   - git
   - vim
-  - ansible
   - openssh-server
   - jq

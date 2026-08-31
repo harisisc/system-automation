@@ -1,12 +1,9 @@
 ---
-- name: Update apt cache and upgrade packages
-  ansible.builtin.apt:
-    update_cache: true
-    cache_valid_time: 3600
-    upgrade: yes
-
+# Full apt upgrades are update.yaml's job (run fleet-wide, independent of
+# this role) - this just keeps the cache fresh enough to install from.
 - name: Install base apt packages
   ansible.builtin.apt:
     name: "{{ base_apt_packages }}"
     state: present
     update_cache: true
+    cache_valid_time: 3600

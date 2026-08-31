@@ -11,8 +11,6 @@
     owner: root
     group: root
     mode: '0755'
-  become: true
-  register: service_file
 
 - name: Install systemd service
   ansible.builtin.template:
@@ -21,17 +19,13 @@
     owner: root
     group: root
     mode: '0644'
-  become: true
-  when: service_file.changed
 
 - name: Reload systemd daemon
   ansible.builtin.systemd:
     daemon_reload: true
-  become: true
 
 - name: Enable wake service
   ansible.builtin.systemd:
     name: set-wake.service
     enabled: true
     state: started
-  become: true

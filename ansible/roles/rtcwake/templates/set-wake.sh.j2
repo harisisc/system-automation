@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 
-TARGET=$(date -d '20:00' +%s)
+TARGET=$(date -d '{{ rtcwake_wake_time }}' +%s)
 NOW=$(date +%s)
 
-# If past 20:00, schedule tomorrow
+# If past {{ rtcwake_wake_time }}, schedule tomorrow
 if [ "$NOW" -gt "$TARGET" ]; then
-  TARGET=$(date -d 'tomorrow 20:00' +%s)
+  TARGET=$(date -d 'tomorrow {{ rtcwake_wake_time }}' +%s)
 fi
 
 /usr/sbin/rtcwake -m no -u -t "$TARGET"

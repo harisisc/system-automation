@@ -1,26 +1,34 @@
 ---
-  - name: Ensure vim is installed
-    ansible.builtin.package:
-      name: vim
-      state: present
+- name: Require user, git_user_name, and git_user_email
+  ansible.builtin.assert:
+    that:
+      - user | length > 0
+      - git_user_name | length > 0
+      - git_user_email | length > 0
+    fail_msg: Set user, git_user_name, and git_user_email when including the preferences role.
 
-  - name: Set default editor to vim
-    ansible.builtin.alternatives:
-      name: editor
-      path: /usr/bin/vim.basic
-  
-  - name: Set EDITOR environment globally
-    ansible.builtin.copy:
-      dest: /etc/profile.d/editor.sh
-      content: |
-        export EDITOR=vim
-        export VISUAL=vim
-      mode: '0644'
+- name: Ensure vim is installed
+  ansible.builtin.package:
+    name: vim
+    state: present
 
-  - name: Deploy gitconfig
-    template:
-      src: gitconfig.j2
-      dest: "/home/{{ user }}/.gitconfig"
-      owner: "{{ user }}"
-      group: "{{ user }}"
-      mode: "0644"
+- name: Set default editor to vim
+  ansible.builtin.alternatives:
+    name: editor
+    path: /usr/bin/vim.basic
+
+- name: Set EDITOR environment globally
+  ansible.builtin.copy:
+    dest: /etc/profile.d/editor.sh
+    content: |
+      export EDITOR=vim
+      export VISUAL=vim
+    mode: '0644'
+
+- name: Deploy gitconfig
+  ansible.builtin.template:
+    src: gitconfig.j2
+    dest: "/home/{{ user }}/.gitconfig"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: "0644"
