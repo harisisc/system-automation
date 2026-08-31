@@ -9,8 +9,17 @@
     groups:
       - sudo
     append: true
-    password: "{{ item.password_hash | default(omit) }}"
+    password: "{{ (user_password | password_hash('sha512')) if user_password else omit }}"
   loop: "{{ users }}"
+
+# Only when a fresh user_password was actually set above - re-running this
+# role to reconcile accounts (e.g. via provision.yaml) shouldn't keep
+# re-expiring passwords people have already changed.
+- name: Force password change at next login
+  ansible.builtin.command: passwd --expire {{ item.username }}
+  loop: "{{ users }}"
+  when: user_password | length > 0
+  changed_when: true
 
 - name: Remove default Ubuntu installer user
   ansible.builtin.user:

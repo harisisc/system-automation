@@ -11,6 +11,10 @@
     - name: target_hostname
       prompt: "Hostname for this machine"
       private: false
+    - name: user_password
+      prompt: "Initial password for user accounts (forced to change at first login)"
+      private: true
+      confirm: true
 
   tasks:
     - name: Create configured users

@@ -1,2 +1,6 @@
 ---
 users: []
+# Shared initial password for newly created accounts - forced to change
+# at first login (see "Force password change at next login" below).
+# Left empty, this role won't touch any existing account's password.
+user_password: ""

@@ -32,39 +32,37 @@ Tailscale (left unauthenticated — run `sudo tailscale up` on the machine
 yourself afterward). Targets exactly one host at a time:
 
 ```sh
-ansible-playbook playbooks/bootstrap.yaml --vault-password-file .vault_pass \
-  -e target_hostname=myhost --limit 192.168.1.91
+ansible-playbook playbooks/bootstrap.yaml --limit 192.168.1.91
 ```
 
-## Configure Login Passwords
+It prompts for two things each run: the machine's hostname, and a shared
+initial password for the configured accounts. That password isn't stored
+anywhere — it's typed fresh every run and immediately hashed on the fly —
+and each account is forced to change it at first login (`passwd --expire`),
+so it only needs to work long enough for someone to log in once and set
+their own. Nothing about a user's real password ever lives in this repo.
 
-`password_hash` values in `inventory/group_vars/all.yaml` are encrypted
-in-place with `ansible-vault` — they're SHA-512 crypt hashes, but still not
-something to commit in plaintext.
+## Secrets (ansible-vault)
 
-Generate a new hash and encrypt it as a `!vault` block:
+Nothing in the repo is currently vaulted (user passwords are handled
+above, without ever touching a file). If you add a secret later, encrypt
+it in place with:
 
 ```sh
-mkpasswd --method=sha-512
-ansible-vault encrypt_string --vault-password-file .vault_pass 'the-hash-from-above' --name 'password_hash'
+ansible-vault encrypt_string --vault-password-file .vault_pass 'the-secret' --name 'var_name'
 ```
 
-Paste the output (the `password_hash: !vault |` block and its indented
-body) in place of the user's existing `password_hash` entry, keeping it
-indented to match the surrounding YAML.
-
-`.vault_pass` holds the vault password and is gitignored — it decrypts
-every vaulted value in this repo, so treat it like a root credential. If
-you don't already have one, generate a strong one and keep a backup
-somewhere safe (a password manager, not this repo):
+`.vault_pass` (gitignored) holds the vault password — treat it like a
+root credential. Generate one if you don't have it yet:
 
 ```sh
 openssl rand -base64 32 > .vault_pass
 chmod 600 .vault_pass
 ```
 
-Without `.vault_pass` on a machine, use `--ask-vault-pass` instead to enter
-it interactively.
+Then pass `--vault-password-file .vault_pass` (or `--ask-vault-pass` to
+enter it interactively) to any `ansible-playbook` command that touches a
+vaulted value.
 
 ## Run Playbooks
 
@@ -76,19 +74,19 @@ thing you mostly only need after a fresh install).
 Run the full build:
 
 ```sh
-ansible-playbook playbooks/site.yaml --vault-password-file .vault_pass
+ansible-playbook playbooks/site.yaml
 ```
 
 Run just the regular maintenance pass:
 
 ```sh
-ansible-playbook playbooks/update.yaml --vault-password-file .vault_pass
+ansible-playbook playbooks/update.yaml
 ```
 
 Run just provisioning:
 
 ```sh
-ansible-playbook playbooks/provision.yaml --vault-password-file .vault_pass
+ansible-playbook playbooks/provision.yaml
 ```
 
 `provision.yaml`'s tasks are tagged by concern (`users`, `apt_packages`,
@@ -98,17 +96,20 @@ user you just added to `group_vars/all.yaml` without re-running everything
 else:
 
 ```sh
-ansible-playbook playbooks/provision.yaml --vault-password-file .vault_pass --tags users
+ansible-playbook playbooks/provision.yaml --tags users
 ```
 
 Or the inverse, everything except Docker:
 
 ```sh
-ansible-playbook playbooks/provision.yaml --vault-password-file .vault_pass --skip-tags docker
+ansible-playbook playbooks/provision.yaml --skip-tags docker
 ```
 
 For anything not covered by a tag, `run_role.yaml` runs one role standalone:
 
 ```sh
-ansible-playbook playbooks/run_role.yaml --vault-password-file .vault_pass -e role_name=syncthing
+ansible-playbook playbooks/run_role.yaml -e role_name=syncthing
 ```
+
+Add `--vault-password-file .vault_pass` to any of these if the repo has
+vaulted values again by the time you're running them (see Secrets above).
