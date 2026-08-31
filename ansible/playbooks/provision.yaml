@@ -10,12 +10,12 @@
           tags: [users]
       tags: [users]
 
-    - name: Install base apt packages
+    - name: Install apt packages
       ansible.builtin.include_role:
-        name: base
+        name: apt_packages
         apply:
-          tags: [base]
-      tags: [base]
+          tags: [apt_packages]
+      tags: [apt_packages]
     - name: Install base snap packages
       ansible.builtin.include_role:
         name: snap_packages

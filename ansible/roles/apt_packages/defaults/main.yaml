@@ -1,5 +1,5 @@
 ---
-base_apt_packages:
+apt_packages_list:
   - ca-certificates
   - curl
   - iputils-ping

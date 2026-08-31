@@ -65,7 +65,7 @@ Run just provisioning:
 ansible-playbook playbooks/provision.yaml --vault-password-file .vault_pass
 ```
 
-`provision.yaml`'s tasks are tagged by concern (`users`, `base`,
+`provision.yaml`'s tasks are tagged by concern (`users`, `apt_packages`,
 `snap_packages`, `docker`, `rtcwake`, `syncthing`, `preferences`), so you
 can run a slice of it without touching the rest — e.g. to pick up a new
 user you just added to `group_vars/all.yaml` without re-running everything
