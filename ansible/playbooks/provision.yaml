@@ -3,63 +3,52 @@
 
   tasks:
     # Base software and user creation
-    - name: Create configured users
-      ansible.builtin.user:
-        name: "{{ item.username }}"
-        state: present
-        system: false
-        shell: /bin/bash
-        create_home: true
-        groups:
-          - sudo
-        append: true
-        password: "{{ item.password_hash | default(omit) }}"
-      loop: "{{ users | default([]) }}"
-      tags: [users]
-
-    - name: Remove default Ubuntu installer user
-      ansible.builtin.user:
-        name: ubuntu
-        state: absent
-        remove: true
-        force: true
-      when: "'ubuntu' not in users | default([]) | map(attribute='username') | list"
-      tags: [users]
-
-    - name: Remove default Ubuntu installer group
-      ansible.builtin.group:
-        name: ubuntu
-        state: absent
-      when: "'ubuntu' not in users | default([]) | map(attribute='username') | list"
+    - name: Create configured users, remove the default ubuntu user
+      ansible.builtin.include_role:
+        name: users
+        apply:
+          tags: [users]
       tags: [users]
 
     - name: Install base apt packages
       ansible.builtin.include_role:
         name: base
+        apply:
+          tags: [base]
       tags: [base]
     - name: Install base snap packages
       ansible.builtin.include_role:
         name: snap_packages
+        apply:
+          tags: [snap_packages]
       tags: [snap_packages]
 
     # Docker (install engine, then add configured users to the docker group)
     - name: Install Docker
       ansible.builtin.include_role:
         name: geerlingguy.docker
+        apply:
+          tags: [docker]
       tags: [docker]
     - name: Add users to the docker group
       ansible.builtin.include_role:
         name: docker
+        apply:
+          tags: [docker]
       tags: [docker]
 
     # Data Sync (rtcwake and syncthing)
     - name: Install and configure rtcwake
       ansible.builtin.include_role:
         name: rtcwake
+        apply:
+          tags: [rtcwake]
       tags: [rtcwake]
     - name: Install and configure Syncthing
       ansible.builtin.include_role:
         name: syncthing
+        apply:
+          tags: [syncthing]
       loop: "{{ users | default([]) | selectattr('syncthing', 'defined') | list }}"
       loop_control:
         loop_var: syncthing_user_config
@@ -73,6 +62,8 @@
     - name: Configure user preferences
       ansible.builtin.include_role:
         name: preferences
+        apply:
+          tags: [preferences]
       loop: "{{ users | default([]) | selectattr('git', 'defined') | list }}"
       loop_control:
         loop_var: preferences_user_config
