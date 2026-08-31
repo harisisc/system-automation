@@ -1,0 +1,39 @@
+---
+# Run once against a freshly autoinstalled machine, before it's promoted
+# from the bootstrap group to workstations (see inventory/hosts.yaml).
+#
+# ansible-playbook playbooks/bootstrap.yaml --limit 192.168.1.91
+- name: Bootstrap a freshly autoinstalled machine
+  hosts: bootstrap
+  become: true
+
+  vars_prompt:
+    - name: target_hostname
+      prompt: "Hostname for this machine"
+      private: false
+
+  tasks:
+    - name: Create configured users
+      ansible.builtin.include_role:
+        name: users
+        apply:
+          tags: [users]
+      tags: [users]
+
+    - name: Set hostname
+      ansible.builtin.include_role:
+        name: hostname
+        apply:
+          tags: [hostname]
+      tags: [hostname]
+
+    # Installs Tailscale but leaves it unauthenticated - run `sudo tailscale
+    # up` on the machine yourself to connect it to your tailnet.
+    - name: Install Tailscale
+      ansible.builtin.include_role:
+        name: artis3n.tailscale.machine
+        apply:
+          tags: [tailscale]
+      vars:
+        tailscale_up_skip: true
+      tags: [tailscale]

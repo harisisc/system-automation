@@ -15,15 +15,26 @@ ansible-galaxy collection install -r collections/requirements.yaml -p ./collecti
 `inventory/hosts.yaml` has two groups, reflecting a machine's lifecycle:
 
 - **`bootstrap`** — freshly autoinstalled machines, reachable only by IP,
-  still with the template's default hostname and no Tailscale. This is
-  what a future hostname + Tailscale playbook targets.
+  still with the template's default hostname and no Tailscale.
+  `playbooks/bootstrap.yaml` targets this group.
 - **`workstations`** — fully set up machines (real hostname, Tailscale
   connected), identified by hostname instead of IP. `provision.yaml`,
   `update.yaml`, and `site.yaml` all target this group, not `bootstrap`.
 
-Once the hostname/Tailscale playbook has run against a `bootstrap` entry,
-move it by hand: delete its IP-keyed line from `bootstrap.hosts` and add a
+Once `bootstrap.yaml` has run against a `bootstrap` entry, move it by
+hand: delete its IP-keyed line from `bootstrap.hosts` and add a
 hostname-keyed line under `workstations.hosts` instead.
+
+## Bootstrap a Freshly Installed Machine
+
+Creates configured user accounts, sets a real hostname, and installs
+Tailscale (left unauthenticated — run `sudo tailscale up` on the machine
+yourself afterward). Targets exactly one host at a time:
+
+```sh
+ansible-playbook playbooks/bootstrap.yaml --vault-password-file .vault_pass \
+  -e target_hostname=myhost --limit 192.168.1.91
+```
 
 ## Configure Login Passwords
 

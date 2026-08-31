@@ -1,0 +1,21 @@
+---
+- name: Require target_hostname and a single target host
+  ansible.builtin.assert:
+    that:
+      - target_hostname is defined
+      - target_hostname | length > 0
+      - ansible_play_hosts_all | length == 1
+    fail_msg: >-
+      Set target_hostname and run against exactly one host with --limit, e.g.
+      ansible-playbook playbooks/bootstrap.yaml -e target_hostname=myhost --limit 192.168.1.91
+
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ target_hostname }}"
+
+- name: Update /etc/hosts entry for the new hostname
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^127\.0\.1\.1[ \t]'
+    line: "127.0.1.1\t{{ target_hostname }}"
+    state: present
