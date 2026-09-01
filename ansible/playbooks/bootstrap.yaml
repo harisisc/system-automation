@@ -24,29 +24,16 @@
           tags: [users]
       tags: [users]
 
-    # Full patch before installing anything else, so the rest of this
-    # play lands on a current base rather than whatever the ISO snapshot
-    # happened to ship with.
+    # Full patch, not the curated apt_packages/snap_packages lists -
+    # that's provision.yaml's job, once this host is promoted to
+    # workstations. Just get the base system current before anything
+    # else lands on it.
     - name: Update apt, snap, and flatpak packages
       ansible.builtin.include_role:
         name: system_update
         apply:
           tags: [system_update]
       tags: [system_update]
-
-    - name: Install apt packages
-      ansible.builtin.include_role:
-        name: apt_packages
-        apply:
-          tags: [apt_packages]
-      tags: [apt_packages]
-
-    - name: Install base snap packages
-      ansible.builtin.include_role:
-        name: snap_packages
-        apply:
-          tags: [snap_packages]
-      tags: [snap_packages]
 
     - name: Set hostname
       ansible.builtin.include_role:
