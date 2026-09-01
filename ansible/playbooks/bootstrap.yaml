@@ -24,6 +24,30 @@
           tags: [users]
       tags: [users]
 
+    # Full patch before installing anything else, so the rest of this
+    # play lands on a current base rather than whatever the ISO snapshot
+    # happened to ship with.
+    - name: Update apt, snap, and flatpak packages
+      ansible.builtin.include_role:
+        name: system_update
+        apply:
+          tags: [system_update]
+      tags: [system_update]
+
+    - name: Install apt packages
+      ansible.builtin.include_role:
+        name: apt_packages
+        apply:
+          tags: [apt_packages]
+      tags: [apt_packages]
+
+    - name: Install base snap packages
+      ansible.builtin.include_role:
+        name: snap_packages
+        apply:
+          tags: [snap_packages]
+      tags: [snap_packages]
+
     - name: Set hostname
       ansible.builtin.include_role:
         name: hostname

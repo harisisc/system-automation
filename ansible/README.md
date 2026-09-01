@@ -27,13 +27,21 @@ hostname-keyed line under `workstations.hosts` instead.
 
 ## Bootstrap a Freshly Installed Machine
 
-Creates configured user accounts, sets a real hostname, and installs
-Tailscale (left unauthenticated — run `sudo tailscale up` on the machine
-yourself afterward). Targets exactly one host at a time:
+Run once against a freshly autoinstalled machine, in order: creates
+configured user accounts, fully patches the system (apt/snap/flatpak, so
+everything after this lands on a current base rather than whatever the
+ISO snapshot shipped with), installs apt/snap packages, sets a real
+hostname, and installs Tailscale (left unauthenticated — run
+`sudo tailscale up` on the machine yourself afterward). Targets exactly
+one host at a time:
 
 ```sh
 ansible-playbook playbooks/bootstrap.yaml --limit 192.168.1.91
 ```
+
+Tagged the same way as `provision.yaml`, by concern (`users`,
+`system_update`, `apt_packages`, `snap_packages`, `hostname`,
+`tailscale`), if you want to re-run just one step.
 
 It prompts for two things each run: the machine's hostname, and a shared
 initial password for the configured accounts. That password isn't stored
