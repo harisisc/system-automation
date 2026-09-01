@@ -31,3 +31,16 @@ Needs either a different validation approach (e.g. validate against the
 real merged config, not the fragment alone) or dropping `validate`
 entirely and relying on the restart handler failing loudly if the config
 is actually bad.
+
+## 2. Docker still isn't wired into provision.yaml
+
+Next thing to pick up. `roles/docker` (adds `docker_users` to the docker
+group) and the vendored `geerlingguy.docker` (actually installs the
+engine) both exist and are ready, but the tasks including them in
+`provision.yaml` are still commented out - `docker_users: [charisis]` in
+`group_vars/all.yaml` currently has no effect. Same fix as `rtcwake`/
+`syncthing` just got: uncomment, tag `[docker]`, add the `apply: tags:`
+propagation (needed for the dynamic-include tag bug fixed earlier this
+session), install `geerlingguy.docker` before the local `docker` role
+(engine + group must exist before users can be added to it), verify
+against a real host.
