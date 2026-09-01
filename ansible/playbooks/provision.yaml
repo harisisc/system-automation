@@ -24,27 +24,27 @@
           tags: [snap_packages]
       tags: [snap_packages]
 
-    # # Data Sync (rtcwake and syncthing)
-    # - name: Install and configure rtcwake
-    #   ansible.builtin.include_role:
-    #     name: rtcwake
-    #     apply:
-    #       tags: [rtcwake]
-    #   tags: [rtcwake]
+    # Data Sync (rtcwake and syncthing)
+    - name: Install and configure rtcwake
+      ansible.builtin.include_role:
+        name: rtcwake
+        apply:
+          tags: [rtcwake]
+      tags: [rtcwake]
 
-    # - name: Install and configure Syncthing
-    #   ansible.builtin.include_role:
-    #     name: syncthing
-    #     apply:
-    #       tags: [syncthing]
-    #   loop: "{{ users | default([]) | selectattr('syncthing', 'defined') | list }}"
-    #   loop_control:
-    #     loop_var: syncthing_user_config
-    #   vars:
-    #     syncthing_user: "{{ syncthing_user_config.username }}"
-    #     syncthing_port: "{{ syncthing_user_config.syncthing.port }}"
-    #     syncthing_directory: "{{ syncthing_user_config.syncthing.directory }}"
-    #   tags: [syncthing]
+    - name: Install and configure Syncthing
+      ansible.builtin.include_role:
+        name: syncthing
+        apply:
+          tags: [syncthing]
+      loop: "{{ users | default([]) | selectattr('syncthing', 'defined') | list }}"
+      loop_control:
+        loop_var: syncthing_user_config
+      vars:
+        syncthing_user: "{{ syncthing_user_config.username }}"
+        syncthing_port: "{{ syncthing_user_config.syncthing.port }}"
+        syncthing_directory: "{{ syncthing_user_config.syncthing.directory }}"
+      tags: [syncthing]
 
     # # Docker (install engine, then add configured users to the docker group)
     # - name: Install Docker
