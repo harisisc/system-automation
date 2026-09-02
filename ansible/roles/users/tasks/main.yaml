@@ -12,6 +12,7 @@
 - name: Create configured users
   ansible.builtin.user:
     name: "{{ item.username }}"
+    comment: "{{ item.fullname | default(omit) }}"
     state: present
     system: false
     shell: /bin/bash
