@@ -1,0 +1,14 @@
+---
+- name: Remove default Ubuntu installer user
+  ansible.builtin.user:
+    name: ubuntu
+    state: absent
+    remove: true
+    force: true
+  when: "'ubuntu' not in users | map(attribute='username') | list"
+
+- name: Remove default Ubuntu installer group
+  ansible.builtin.group:
+    name: ubuntu
+    state: absent
+  when: "'ubuntu' not in users | map(attribute='username') | list"

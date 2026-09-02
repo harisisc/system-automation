@@ -1,0 +1,111 @@
+---
+# Read-only, so this should run for real even under --check - needed to
+# tell "just created this run" apart from "already existed" below.
+- name: Check which configured users already exist
+  ansible.builtin.command: getent passwd {{ item.username }}
+  loop: "{{ users }}"
+  register: existing_users_check
+  check_mode: false
+  failed_when: false
+  changed_when: false
+
+- name: Create configured users
+  ansible.builtin.user:
+    name: "{{ item.username }}"
+    comment: "{{ item.fullname | default(omit) }}"
+    state: present
+    system: false
+    shell: /bin/bash
+    create_home: true
+    groups: "{{ user_default_groups }}"
+    append: true
+    password: "{{ (user_password | password_hash('sha512')) if user_password else omit }}"
+    # Only ever set the password at account creation - without this,
+    # bootstrap.yaml's always-prompted user_password would overwrite
+    # someone's real, already-changed password on every re-run.
+    update_password: on_create
+  loop: "{{ users }}"
+
+# Only for accounts that didn't already exist before this run (per the
+# getent check above), and only when a fresh user_password was actually
+# set - re-running this role to reconcile accounts (e.g. via
+# provision.yaml, or a second bootstrap.yaml run) shouldn't keep
+# re-expiring passwords people have already changed.
+- name: Force password change at next login for newly created users
+  ansible.builtin.command: passwd --expire {{ item.item.username }}
+  loop: "{{ existing_users_check.results }}"
+  when: user_password | length > 0 and item.rc != 0
+  changed_when: true
+
+# Optional per-user - avatars are real photos, so they're never committed
+# (inventory/group_vars/avatars/ is gitignored). Drop <username>.png there
+# yourself; users without a file there are just skipped, no error.
+#
+# Setting the picture requires AccountsService's own SetIconFile dbus call,
+# not just dropping a file in place:
+# - Writing straight to ~/.face (a fresh account's Icon= default) doesn't
+#   work because home dirs are 750 - gdm can't traverse into the directory
+#   to read it, regardless of the file's own permissions (confirmed on a
+#   real bootstrapped machine).
+# - Writing straight to the "conventional" icons/ path doesn't help either
+#   unless Icon= is actually repointed there - a fresh account's Icon=
+#   still defaults to the unreachable ~/.face path.
+# - SetIconFile is the fix for both: it copies its source file into icons/
+#   itself (root:root, world-readable) and repoints Icon= there - the same
+#   thing GNOME's own "change avatar" UI does. But it also hard-rejects
+#   anything much over ~1MB, so real photos need resizing first.
+- name: Create local temp directory for resized avatar images
+  ansible.builtin.tempfile:
+    state: directory
+    suffix: avatars
+  delegate_to: localhost
+  become: false
+  register: avatar_tmpdir
+  changed_when: false
+
+- name: Resize avatar images to fit AccountsService's icon size limit
+  ansible.builtin.command:
+    cmd: convert {{ inventory_dir }}/group_vars/avatars/{{ item.username }}.png -resize 256x256 {{ avatar_tmpdir.path }}/{{ item.username }}.png
+  delegate_to: localhost
+  become: false
+  loop: "{{ users }}"
+  when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
+  changed_when: true
+
+- name: Upload resized avatar images to a remote temp path
+  ansible.builtin.copy:
+    src: "{{ avatar_tmpdir.path }}/{{ item.username }}.png"
+    dest: "/tmp/ansible-avatar-{{ item.username }}.png"
+    mode: "0644"
+  loop: "{{ users }}"
+  when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
+
+- name: Look up UID for each user with an avatar (AccountsService's dbus object path is /org/freedesktop/Accounts/User<uid>)
+  ansible.builtin.command: id -u {{ item.username }}
+  loop: "{{ users }}"
+  register: avatar_user_uids
+  changed_when: false
+  when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
+
+- name: Set user login/profile picture via AccountsService's own SetIconFile call
+  ansible.builtin.command: >
+    busctl --system call org.freedesktop.Accounts
+    /org/freedesktop/Accounts/User{{ item.stdout | trim }}
+    org.freedesktop.Accounts.User SetIconFile s /tmp/ansible-avatar-{{ item.item.username }}.png
+  loop: "{{ avatar_user_uids.results }}"
+  when: item.stdout is defined
+  changed_when: true
+
+- name: Remove remote temp avatar files
+  ansible.builtin.file:
+    path: "/tmp/ansible-avatar-{{ item.username }}.png"
+    state: absent
+  loop: "{{ users }}"
+  when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
+
+- name: Remove local temp directory for resized avatar images
+  ansible.builtin.file:
+    path: "{{ avatar_tmpdir.path }}"
+    state: absent
+  delegate_to: localhost
+  become: false
