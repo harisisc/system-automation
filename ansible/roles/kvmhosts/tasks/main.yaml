@@ -10,3 +10,11 @@
     name: "{{ kvmhosts_packages }}"
     state: present
     update_cache: true
+
+- name: Add users to libvirt group
+  ansible.builtin.user:
+    name: "{{ item }}"
+    groups: libvirt
+    append: true
+  loop: "{{ libvirt_users }}"
+  when: libvirt_users | length > 0

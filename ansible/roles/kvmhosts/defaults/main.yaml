@@ -1,4 +1,5 @@
 ---
+libvirt_users: []
 kvmhosts_packages:
   - qemu-kvm
   - qemu-utils

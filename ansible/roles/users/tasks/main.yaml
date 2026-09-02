@@ -16,8 +16,7 @@
     system: false
     shell: /bin/bash
     create_home: true
-    groups:
-      - sudo
+    groups: "{{ user_default_groups }}"
     append: true
     password: "{{ (user_password | password_hash('sha512')) if user_password else omit }}"
     # Only ever set the password at account creation - without this,

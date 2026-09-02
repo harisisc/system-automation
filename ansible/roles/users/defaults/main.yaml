@@ -1,5 +1,18 @@
 ---
 users: []
+# Baseline groups every configured user gets, independent of any specific
+# software - matches Ubuntu's own installer defaults for the first admin
+# user. Software-specific groups (docker, libvirt, ...) are deliberately
+# NOT here - they can't exist until that software is installed, so each
+# one is added by that software's own role instead, after install, the
+# same way the docker role already does it.
+user_default_groups:
+  - sudo
+  - adm
+  - cdrom
+  - dip
+  - plugdev
+  - lpadmin
 # Shared initial password for newly created accounts - forced to change
 # at first login (see "Force password change at next login" below).
 # Left empty, this role won't touch any existing account's password.
