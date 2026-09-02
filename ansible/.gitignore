@@ -13,6 +13,10 @@ inventory/*
 !inventory/group_vars/all.yaml
 !inventory/host_vars/
 
+# Avatar images are real photos - never commit them, even though
+# group_vars/ itself is tracked above.
+inventory/group_vars/avatars/*
+
 # external installs
 collections/*
 

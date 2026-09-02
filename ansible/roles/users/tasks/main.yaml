@@ -37,6 +37,19 @@
   when: user_password | length > 0 and item.rc != 0
   changed_when: true
 
+# Optional per-user - avatars are real photos, so they're never committed
+# (inventory/group_vars/avatars/ is gitignored). Drop <username>.png there
+# yourself; users without a file there are just skipped, no error.
+- name: Set user login/profile picture if provided
+  ansible.builtin.copy:
+    src: "{{ inventory_dir }}/group_vars/avatars/{{ item.username }}.png"
+    dest: "/var/lib/AccountsService/icons/{{ item.username }}"
+    owner: root
+    group: root
+    mode: "0644"
+  loop: "{{ users }}"
+  when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
+
 - name: Remove default Ubuntu installer user
   ansible.builtin.user:
     name: ubuntu
