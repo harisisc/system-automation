@@ -16,4 +16,5 @@ local Ubuntu workstations:
 3. Use `ansible/` to configure the machine.
 
 The two directories don't depend on each other beyond that hand-off — see
-each one's own README for setup and usage.
+each one's own README for setup and usage, or [`Setup.md`](Setup.md) for
+the full step-by-step runbook.
