@@ -10,6 +10,13 @@ ansible-galaxy role install -r roles_external/requirements.yaml -p ./roles_exter
 ansible-galaxy collection install -r collections/requirements.yaml -p ./collections
 ```
 
+The `users` role also needs ImageMagick's `convert` on the control machine
+(not the target) if you're using avatar images — see below.
+
+```sh
+sudo apt install imagemagick
+```
+
 ## Inventory
 
 `inventory/hosts.yaml` has two groups, reflecting a machine's lifecycle:
@@ -70,6 +77,15 @@ Then, on the machine itself:
 ```sh
 sudo tailscale up --accept-routes --auth-key=tskey-auth-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
+
+## User Avatars
+
+Drop `<username>.png` into `inventory/group_vars/avatars/` (gitignored —
+these are real photos, never committed) to give that account a login/profile
+picture. Users without a file there are just skipped, no error. The `users`
+role resizes it and sets it via AccountsService's own dbus call, since
+GNOME's avatar picker enforces a size limit and won't take a raw photo
+straight from a phone.
 
 ## Secrets (ansible-vault)
 
