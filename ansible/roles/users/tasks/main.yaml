@@ -40,12 +40,31 @@
 # Optional per-user - avatars are real photos, so they're never committed
 # (inventory/group_vars/avatars/ is gitignored). Drop <username>.png there
 # yourself; users without a file there are just skipped, no error.
-- name: Set user login/profile picture if provided
+#
+# Written to two places, since dropping the file at the "conventional"
+# icons/ path alone isn't enough - AccountsService only shows what its
+# own per-user record's Icon= actually points at, and a freshly-created
+# account defaults that to ~/.face (confirmed on a real bootstrapped
+# machine), not the icons/ path. GNOME's own "change avatar" UI writes to
+# and repoints Icon= at the icons/ path instead, so keeping both covers
+# a fresh account (via .face) and one already reconfigured through the
+# UI (via icons/) without needing to touch AccountsService's ini file.
+- name: Set user login/profile picture (AccountsService icons path)
   ansible.builtin.copy:
     src: "{{ inventory_dir }}/group_vars/avatars/{{ item.username }}.png"
     dest: "/var/lib/AccountsService/icons/{{ item.username }}"
     owner: root
     group: root
+    mode: "0644"
+  loop: "{{ users }}"
+  when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
+
+- name: Set user login/profile picture (~/.face, a fresh account's Icon= default)
+  ansible.builtin.copy:
+    src: "{{ inventory_dir }}/group_vars/avatars/{{ item.username }}.png"
+    dest: "/home/{{ item.username }}/.face"
+    owner: "{{ item.username }}"
+    group: "{{ item.username }}"
     mode: "0644"
   loop: "{{ users }}"
   when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
