@@ -62,6 +62,19 @@ git clone git@github.com:harisisc/system-automation.git
 cd system-automation
 ```
 
+**Set up your real inventory** — `ansible/inventory/` isn't tracked in
+git (real hostnames, IPs, names, avatar photos); copy the dummy example
+and fill in your own:
+
+```sh
+cp -r ansible/inventory.example ansible/inventory
+```
+
+Edit `ansible/inventory/hosts.yaml` and
+`ansible/inventory/group_vars/all.yaml` with your own machines and users
+now, or as you go — steps 3 and 8 below point back here each time you add
+one.
+
 **Install role/collection dependencies** (see
 [`ansible/README.md`](ansible/README.md#install-rolecollection-dependencies)):
 
@@ -112,9 +125,9 @@ client list, or `ping ubuntu.local`).
 
 ## 3. Add the machine to inventory and configure its users
 
-Add the new machine under the `bootstrap` group in
-[`ansible/inventory/hosts.yaml`](ansible/inventory/hosts.yaml), keyed by
-its IP:
+Add the new machine under the `bootstrap` group in your local
+`ansible/inventory/hosts.yaml` (not tracked in git — see step 0), keyed
+by its IP:
 
 ```yaml
 bootstrap:
@@ -122,10 +135,10 @@ bootstrap:
     192.168.1.91: {}
 ```
 
-If this machine needs a user account that isn't already in
-[`ansible/inventory/group_vars/all.yaml`](ansible/inventory/group_vars/all.yaml)'s
-`users:` list, add them there now (and drop an optional
-`<username>.png` avatar into `inventory/group_vars/avatars/` — see
+If this machine needs a user account that isn't already in your local
+`ansible/inventory/group_vars/all.yaml`'s `users:` list, add them there
+now (and drop an optional `<username>.png` avatar into
+`inventory/group_vars/avatars/` — see
 [`ansible/README.md`](ansible/README.md#user-avatars)).
 
 ## 4. Run bootstrap.yaml

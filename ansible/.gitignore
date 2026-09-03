@@ -4,18 +4,10 @@
 # Vault password - never commit this, it decrypts every secret in the repo.
 .vault_pass
 
-# Local/ad-hoc inventory files (e.g. throwaway test inventories) - the
-# real, tracked inventory content is explicitly allowlisted below.
-inventory/*
-
-!inventory/hosts.yaml
-!inventory/group_vars/
-!inventory/group_vars/all.yaml
-!inventory/host_vars/
-
-# Avatar images are real photos - never commit them, even though
-# group_vars/ itself is tracked above.
-inventory/group_vars/avatars/*
+# Real inventory - hostnames, IPs, real names, avatar photos. Never
+# committed; inventory.example/ (tracked) mirrors its structure with
+# dummy data. See README.md for copying it into place.
+inventory/
 
 # external installs
 collections/*

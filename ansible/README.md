@@ -19,6 +19,17 @@ sudo apt install imagemagick
 
 ## Inventory
 
+`inventory/` isn't tracked in git — it holds real hostnames, IPs, real
+names, and avatar photos. `inventory.example/` mirrors its structure
+with dummy data; copy it into place before anything else here will work:
+
+```sh
+cp -r inventory.example inventory
+```
+
+Then edit `inventory/hosts.yaml` and `inventory/group_vars/all.yaml`
+with your own machines and users.
+
 `inventory/hosts.yaml` has two groups, reflecting a machine's lifecycle:
 
 - **`bootstrap`** — freshly autoinstalled machines, reachable only by IP,
