@@ -16,13 +16,50 @@ Not covered here — deliberately out of scope for a clean install:
 ## 0. One-time prerequisites (skip if already done)
 
 These aren't per-machine — do them once, ever, on your own workstation.
+From here on, everything in this runbook — every command below, and
+every `ansible-playbook` run in the steps that follow — happens while
+logged in as a dedicated local `ansible` account, not your personal
+login. Keeps automation credentials (this account's SSH key, and
+anything vaulted later) separate from your own.
 
-**Generate the Ansible SSH keypair.** Every autoinstalled machine gets
-this key's public half baked in for the `ansible` account; `ansible/`
-uses the private half to connect.
+**Create the local `ansible` account.** Mirrors what
+`autoinstall.yaml.template` gives the `ansible` account on every machine
+it provisions: passwordless sudo, key-only login (no password auth at
+all).
 
 ```sh
+sudo useradd --create-home --shell /bin/bash --comment "Ansible Service Account" ansible
+sudo usermod -aG sudo ansible
+echo "ansible ALL=(ALL) NOPASSWD:ALL" | sudo tee /etc/sudoers.d/ansible
+sudo chmod 440 /etc/sudoers.d/ansible
+sudo passwd -l ansible
+```
+
+**Switch into it and generate its SSH keypair.** Every autoinstalled
+machine gets this key's public half baked in for its own `ansible`
+account; this key's private half, held here, is what actually connects
+to them.
+
+```sh
+sudo su - ansible
 ssh-keygen -t ed25519 -f ~/.ssh/ansible_ed25519 -C ansible
+```
+
+Run interactively, this prompts for a passphrase — enter one; an
+unencrypted private key means anyone who reads that file off disk can
+use it to reach every machine you manage. Load it into your SSH agent
+so `ansible-playbook` doesn't stop and ask for it on every run:
+
+```sh
+ssh-add ~/.ssh/ansible_ed25519
+```
+
+**Get a copy of this repo here too** — everything from here on runs out
+of this account's checkout, not your personal one:
+
+```sh
+git clone git@github.com:harisisc/system-automation.git
+cd system-automation
 ```
 
 **Install role/collection dependencies** (see
@@ -65,9 +102,10 @@ for details (public key prompting, requirements, etc).
 
 Boot the target machine from the USB drive. The install is fully
 unattended — it creates an `ansible` user (key-only SSH, passwordless
-sudo) and locks out the `ubuntu` user. LUKS disk encryption is enabled
-with a shared placeholder passphrase (`changeme`) — that gets replaced
-in step 6.
+sudo) and a `ubuntu` user with a shared placeholder password
+(`changeme`), for initial console access only. LUKS disk encryption is
+also enabled with that same shared placeholder passphrase. Both get
+replaced in step 6.
 
 Once it reboots, note the machine's LAN IP (check your router's DHCP
 client list, or `ping ubuntu.local`).
@@ -118,7 +156,7 @@ initial password from step 4. Linux will immediately prompt you to set a
 real password (that's `passwd --expire` from bootstrap.yaml kicking in) —
 set it there.
 
-## 6. Set the real LUKS passphrase
+## 6. Set the real LUKS passphrase and retire the ubuntu account's password
 
 Still at the console (or over SSH, this part has no race-condition
 concern):
@@ -126,6 +164,7 @@ concern):
 ```sh
 lsblk -f   # find the crypto_LUKS partition, e.g. /dev/nvme0n1p3
 sudo cryptsetup luksChangeKey /dev/nvme0n1p3
+sudo passwd ubuntu
 ```
 
 See [`autoinstall/README.md`](autoinstall/README.md#update-a-luks-passphrase)
