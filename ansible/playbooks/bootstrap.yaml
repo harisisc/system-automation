@@ -20,6 +20,7 @@
     - name: Create configured users
       ansible.builtin.include_role:
         name: users
+        tasks_from: create_users.yaml
         apply:
           tags: [users]
       tags: [users]
@@ -28,12 +29,27 @@
     # that's provision.yaml's job, once this host is promoted to
     # workstations. Just get the base system current before anything
     # else lands on it.
+    #
+    # Must run before removing the default ubuntu user below: snapd has
+    # pending per-user service-enablement work (snapd-desktop-integration,
+    # prompting-client) queued against the ubuntu account from the
+    # live-install environment, keyed to its home dir. `snap refresh`
+    # fails ("Unit ... does not exist") if that account's already gone by
+    # the time it runs - confirmed on a real autoinstalled machine.
     - name: Update apt, snap, and flatpak packages
       ansible.builtin.include_role:
         name: system_update
         apply:
           tags: [system_update]
       tags: [system_update]
+
+    - name: Remove default Ubuntu installer user
+      ansible.builtin.include_role:
+        name: users
+        tasks_from: remove_default_user.yaml
+        apply:
+          tags: [users]
+      tags: [users]
 
     - name: Set hostname
       ansible.builtin.include_role:
