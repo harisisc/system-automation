@@ -9,11 +9,13 @@ autoinstall:
   identity:
     hostname: ubuntu
     username: ubuntu
-    # "!" is the standard Linux convention for a locked account (no hash
-    # will ever match it) - this account is only a placeholder for install;
-    # Ansible creates the real users, and ../ansible connects as its own
-    # key-only "ansible" service account below.
-    password: "!"
+    # Shared, hardcoded default password ("changeme"), same idea as the
+    # LUKS passphrase below - this account is only a placeholder for
+    # install; Ansible creates the real users, and ../ansible connects as
+    # its own key-only "ansible" service account below. Change this
+    # password after first boot (e.g. `sudo passwd ubuntu`), same as the
+    # LUKS passphrase.
+    password: "$6$7Bpi1korzyYkEumk$/y6Wf/x9G2WF8wul.HOs7Rgy5Ku.yPn7qE9wYanoA7IV11WoIzcZ4R1XY2e3jDxMGskfg5UNQdj.LaqMV0TfJ."
 
   ssh:
     install-server: true
