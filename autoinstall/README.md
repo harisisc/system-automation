@@ -111,19 +111,24 @@ Do this on every machine after first boot — the passphrase baked into the
 template (`changeme`) is the same on every install and isn't meant to be
 kept.
 
-Find the encrypted partition. Look for `crypto_LUKS` in the filesystem type
-column:
+Find the encrypted partition:
 
 ```sh
 lsblk -f
 ```
 
-Example encrypted partitions:
+Search the output for a device with type `crypto_LUKS` (its LUKS format
+version, e.g. `2`, shows in the next column over) — that's the raw
+partition, not the `dm_crypt-0`-style mapper device nested underneath it.
+Example:
 
 ```text
-/dev/nvme0n1p3  crypto_LUKS
-/dev/sda3       crypto_LUKS
+NAME                    FSTYPE      FSVER
+vda3                    crypto_LUKS 2
+└─dm_crypt-0            LVM2_member LVM2 001
 ```
+
+Here that's `/dev/vda3`, not `/dev/dm_crypt-0`.
 
 Change the passphrase. Replace `/dev/sdX3` with the encrypted partition from
 `lsblk -f`:

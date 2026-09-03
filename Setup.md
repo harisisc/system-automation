@@ -162,8 +162,17 @@ Still at the console (or over SSH, this part has no race-condition
 concern):
 
 ```sh
-lsblk -f   # find the crypto_LUKS partition, e.g. /dev/nvme0n1p3
-sudo cryptsetup luksChangeKey /dev/nvme0n1p3
+lsblk -f
+```
+
+Search the output for a device with type `crypto_LUKS` — that's the raw
+partition (e.g. `/dev/vda3`), not the `dm_crypt-0`-style mapper device
+nested underneath it. See
+[`autoinstall/README.md`](autoinstall/README.md#update-a-luks-passphrase)
+for an example.
+
+```sh
+sudo cryptsetup luksChangeKey /dev/vda3
 sudo passwd ubuntu
 ```
 
