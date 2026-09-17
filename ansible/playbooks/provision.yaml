@@ -46,16 +46,12 @@
         syncthing_directory: "{{ syncthing_user_config.syncthing.directory }}"
       tags: [syncthing]
 
-    # Docker (install engine, then add configured users to the docker group)
+    # Installs the engine and adds docker_users to the docker group -
+    # both handled natively by this role, reading docker_users straight
+    # out of group_vars/all.yaml like any other play variable.
     - name: Install Docker
       ansible.builtin.include_role:
         name: geerlingguy.docker
-        apply:
-          tags: [docker]
-      tags: [docker]
-    - name: Add users to the docker group
-      ansible.builtin.include_role:
-        name: docker
         apply:
           tags: [docker]
       tags: [docker]
