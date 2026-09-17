@@ -58,7 +58,7 @@ ssh-add ~/.ssh/ansible_ed25519
 of this account's checkout, not your personal one:
 
 ```sh
-git clone git@github.com:harisisc/system-automation.git
+git clone https://github.com/harisisc/system-automation.git
 cd system-automation
 ```
 
