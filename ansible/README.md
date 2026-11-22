@@ -17,6 +17,22 @@ The `users` role also needs ImageMagick's `convert` on the control machine
 sudo apt install imagemagick
 ```
 
+## Back Up the Ansible SSH Key
+
+`ansible_ssh_private_key_file` (`~/.ssh/ansible_ed25519` by default -
+see `inventory.example/group_vars/all.yaml`) only ever exists on this
+control machine. Every managed machine only ever gets its *public* half
+(baked into `authorized_keys` at install time by `../autoinstall`), so
+there's no copy anywhere else to fall back on - if this machine dies
+without a backup, you lose SSH access to every machine you manage at
+once. Deliberately not fixed by copying the private key to the managed
+machines too - that would mean one compromised machine handing over
+access to all of them.
+
+Back it up yourself instead: copy the private key's contents (`cat
+~/.ssh/ansible_ed25519`) into your password manager as a secure note,
+along with its passphrase.
+
 ## Inventory
 
 `inventory/` isn't tracked in git — it holds real hostnames, IPs, real

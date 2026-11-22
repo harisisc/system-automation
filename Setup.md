@@ -54,6 +54,17 @@ so `ansible-playbook` doesn't stop and ask for it on every run:
 ssh-add ~/.ssh/ansible_ed25519
 ```
 
+**Back it up.** This key only ever exists in one place - if this
+machine dies without a backup, you lose SSH access to every machine you
+manage at once, since only the *public* half was ever copied anywhere
+(baked into each machine's `authorized_keys` at install time). Copy the
+private key's contents into your password manager as a secure note
+(along with its passphrase):
+
+```sh
+cat ~/.ssh/ansible_ed25519
+```
+
 **Get a copy of this repo here too** — everything from here on runs out
 of this account's checkout, not your personal one:
 
