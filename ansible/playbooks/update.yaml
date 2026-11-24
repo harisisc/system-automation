@@ -1,9 +1,0 @@
----
-- name: Update software (apt, snap, and flatpak)
-  hosts: workstations
-  become: true
-
-  tasks:
-    - name: Update apt, snap, and flatpak packages
-      ansible.builtin.include_role:
-        name: system_update
