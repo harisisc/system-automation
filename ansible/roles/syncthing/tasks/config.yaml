@@ -13,9 +13,11 @@
     group: "{{ syncthing_user }}"
     mode: "0700"
 
+# --no-default-folder: no "default" folder at ~/Sync. Folders are shared
+# in from other devices and accepted by hand.
 - name: Generate Syncthing config
   ansible.builtin.command:
-    cmd: syncthing generate --home=/home/{{ syncthing_user }}/.local/state/syncthing
+    cmd: syncthing generate --no-default-folder --home=/home/{{ syncthing_user }}/.local/state/syncthing
     creates: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
   become_user: "{{ syncthing_user }}"
 
@@ -51,15 +53,3 @@
     attribute: name
     value: "{{ ansible_hostname }}-{{ syncthing_user }}"
   become_user: "{{ syncthing_user }}"
-
-- name: Configure Syncthing folder directory
-  community.general.xml:
-    path: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
-    xpath: /configuration/folder[@id='default']/path
-    value: "{{ syncthing_directory }}"
-  become_user: "{{ syncthing_user }}"
-
-- name: Remove Syncthing default Sync directory
-  ansible.builtin.file:
-    path: /home/{{ syncthing_user }}/Sync
-    state: absent
