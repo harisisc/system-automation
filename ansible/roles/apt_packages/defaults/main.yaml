@@ -10,3 +10,4 @@ apt_packages_list:
   - vim
   - openssh-server
   - jq
+  - gparted
