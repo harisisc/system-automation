@@ -16,13 +16,73 @@
       private: true
       confirm: true
 
+  # Guards against bootstrapping the wrong machine. Everything here runs
+  # before any change is made.
+  pre_tasks:
+    - name: Require exactly one target host and a hostname
+      ansible.builtin.assert:
+        that:
+          - ansible_play_hosts_all | length == 1
+          - target_hostname | trim | length > 0
+        fail_msg: >-
+          Run bootstrap.yaml against exactly one host with --limit
+          (got {{ ansible_play_hosts_all | length }}) and give it a non-empty
+          hostname, e.g.
+          ansible-playbook playbooks/bootstrap.yaml --limit 192.168.1.91
+      tags: [always]
+
+    # Read-only, so it runs for real even under --check.
+    - name: Check whether the ubuntu installer account still exists
+      ansible.builtin.command: getent passwd ubuntu
+      register: bootstrap_ubuntu_user
+      check_mode: false
+      failed_when: false
+      changed_when: false
+      tags: [always]
+
+    # A freshly autoinstalled machine still has the template's "ubuntu"
+    # hostname and account. Bootstrap changes both, so any machine that's
+    # already been bootstrapped fails this, whichever inventory or
+    # directory the playbook was run from.
+    - name: Refuse machines that aren't freshly installed
+      ansible.builtin.assert:
+        that:
+          - ansible_facts['hostname'] == 'ubuntu'
+          - bootstrap_ubuntu_user.rc == 0
+        fail_msg: >-
+          {{ inventory_hostname }} doesn't look freshly installed
+          (hostname is "{{ ansible_facts['hostname'] }}", expected "ubuntu";
+          ubuntu account {{ 'exists' if bootstrap_ubuntu_user.rc == 0 else 'is gone' }}).
+          Refusing to bootstrap. Override with -e bootstrap_force=true
+          if you really mean it.
+      when: not (bootstrap_force | default(false) | bool)
+      tags: [always]
+
+    # Fails closed: with no terminal to answer, user_input is empty and
+    # the check below fails.
+    - name: Confirm the target before changing anything
+      ansible.builtin.pause:
+        prompt: >-
+          Bootstrapping {{ inventory_hostname }}
+          (currently "{{ ansible_facts['hostname'] }}",
+          {{ ansible_facts['default_ipv4']['address'] | default('no default IPv4') }})
+          -> new hostname "{{ target_hostname }}".
+          Type {{ target_hostname }} to continue
+      register: bootstrap_confirm
+      tags: [always]
+
+    - name: Check the confirmation
+      ansible.builtin.assert:
+        that:
+          - bootstrap_confirm.user_input | default('') | trim == target_hostname
+        fail_msg: "Confirmation didn't match \"{{ target_hostname }}\". Nothing was changed."
+        quiet: true
+      tags: [always]
+
   tasks:
     - name: Create configured users
-      ansible.builtin.include_role:
+      ansible.builtin.import_role:
         name: users
-        tasks_from: create_users.yaml
-        apply:
-          tags: [users]
       tags: [users]
 
     # Full patch, not the curated apt_packages/snap_packages lists -
@@ -37,34 +97,45 @@
     # fails ("Unit ... does not exist") if that account's already gone by
     # the time it runs - confirmed on a real autoinstalled machine.
     - name: Update apt, snap, and flatpak packages
-      ansible.builtin.include_role:
+      ansible.builtin.import_role:
         name: system_update
-        apply:
-          tags: [system_update]
       tags: [system_update]
 
+    # Skipped if you've deliberately configured a user named "ubuntu".
     - name: Remove default Ubuntu installer user
-      ansible.builtin.include_role:
-        name: users
-        tasks_from: remove_default_user.yaml
-        apply:
-          tags: [users]
+      ansible.builtin.user:
+        name: ubuntu
+        state: absent
+        remove: true
+        force: true
+      when: "'ubuntu' not in users | map(attribute='username') | list"
+      tags: [users]
+
+    - name: Remove default Ubuntu installer group
+      ansible.builtin.group:
+        name: ubuntu
+        state: absent
+      when: "'ubuntu' not in users | map(attribute='username') | list"
       tags: [users]
 
     - name: Set hostname
-      ansible.builtin.include_role:
-        name: hostname
-        apply:
-          tags: [hostname]
+      ansible.builtin.hostname:
+        name: "{{ target_hostname }}"
+      tags: [hostname]
+
+    - name: Update /etc/hosts entry for the new hostname
+      ansible.builtin.lineinfile:
+        path: /etc/hosts
+        regexp: '^127\.0\.1\.1[ \t]'
+        line: "127.0.1.1\t{{ target_hostname }}"
+        state: present
       tags: [hostname]
 
     # Installs Tailscale but leaves it unauthenticated - run `sudo tailscale
     # up` on the machine yourself to connect it to your tailnet.
     - name: Install Tailscale
-      ansible.builtin.include_role:
+      ansible.builtin.import_role:
         name: artis3n.tailscale.machine
-        apply:
-          tags: [tailscale]
       vars:
         tailscale_up_skip: true
       tags: [tailscale]

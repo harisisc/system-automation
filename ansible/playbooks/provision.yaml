@@ -3,33 +3,25 @@
 
   tasks:
     # Base software and user creation
-    - name: Create configured users, remove the default ubuntu user
-      ansible.builtin.include_role:
+    - name: Create configured users
+      ansible.builtin.import_role:
         name: users
-        apply:
-          tags: [users]
       tags: [users]
 
     - name: Install apt packages
-      ansible.builtin.include_role:
+      ansible.builtin.import_role:
         name: apt_packages
-        apply:
-          tags: [apt_packages]
       tags: [apt_packages]
       
     - name: Install base snap packages
-      ansible.builtin.include_role:
+      ansible.builtin.import_role:
         name: snap_packages
-        apply:
-          tags: [snap_packages]
       tags: [snap_packages]
 
     # Data Sync (rtcwake and syncthing)
     - name: Install and configure rtcwake
-      ansible.builtin.include_role:
+      ansible.builtin.import_role:
         name: rtcwake
-        apply:
-          tags: [rtcwake]
       tags: [rtcwake]
 
     - name: Install and configure Syncthing
@@ -50,23 +42,15 @@
     # both handled natively by this role, reading docker_users straight
     # out of group_vars/all.yaml like any other play variable.
     - name: Install Docker
-      ansible.builtin.include_role:
+      ansible.builtin.import_role:
         name: geerlingguy.docker
-        apply:
-          tags: [docker]
       tags: [docker]
 
-    # # Per-user preferences (editor, gitconfig)
-    # - name: Configure user preferences
-    #   ansible.builtin.include_role:
-    #     name: preferences
-    #     apply:
-    #       tags: [preferences]
-    #   loop: "{{ users | default([]) | selectattr('git', 'defined') | list }}"
-    #   loop_control:
-    #     loop_var: preferences_user_config
-    #   vars:
-    #     user: "{{ preferences_user_config.username }}"
-    #     git_user_name: "{{ preferences_user_config.git.user_name }}"
-    #     git_user_email: "{{ preferences_user_config.git.user_email }}"
-    #   tags: [preferences]
+    # libvirt/QEMU/GNOME Boxes, and adds libvirt_users to the libvirt
+    # group. Skipped on machines that are themselves VMs (nested
+    # virtualization isn't worth it there).
+    - name: Install KVM and libvirt
+      ansible.builtin.import_role:
+        name: kvmhosts
+      when: ansible_facts['virtualization_role'] | default('host') != 'guest'
+      tags: [kvmhosts]

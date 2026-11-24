@@ -15,5 +15,7 @@ user_default_groups:
   - lpadmin
 # Shared initial password for newly created accounts - forced to change
 # at first login (see "Force password change at next login" below).
-# Left empty, this role won't touch any existing account's password.
+# Left empty, this role won't touch any existing account's password, and
+# new accounts are created locked (no password) - intentional for users
+# added after bootstrap. Set one by hand with `sudo passwd <user>`.
 user_password: ""
