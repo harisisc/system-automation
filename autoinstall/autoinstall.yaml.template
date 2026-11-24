@@ -26,6 +26,9 @@ autoinstall:
   storage:
     layout:
       name: lvm
+      # Default "scaled" policy caps the root LV at 100GB and leaves the
+      # rest of the VG unallocated - give root the whole disk instead.
+      sizing-policy: all
       # Fixed for now - same passphrase on every install. Change it after
       # first boot with cryptsetup luksChangeKey (see README).
       password: "changeme"
