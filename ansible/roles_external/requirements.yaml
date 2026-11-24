@@ -1,6 +1,9 @@
-# requirements.yml
+# requirements.yaml
 
-# ansible-galaxy role install -r roles_external/requirements.yml -p ./roles_external
+# ansible-galaxy role install -r roles_external/requirements.yaml -p ./roles_external
 
 roles:
+  # Pinned to the version in use. 8.0.1 (2026-11-15) is out; bump once
+  # it's had some time.
   - name: geerlingguy.docker
+    version: "8.0.0"
