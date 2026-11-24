@@ -11,6 +11,7 @@
     owner: root
     group: root
     mode: '0755'
+  notify: Run set-wake
 
 - name: Install systemd service
   ansible.builtin.template:
@@ -19,13 +20,15 @@
     owner: root
     group: root
     mode: '0644'
+  notify:
+    - Reload systemd
+    - Run set-wake
 
-- name: Reload systemd daemon
-  ansible.builtin.systemd:
-    daemon_reload: true
-
+# Only enabled here, not started: it's a oneshot, so `state: started`
+# would re-run it (and report "changed") on every provision. The handlers
+# run it once whenever the script or unit actually changes, and it runs
+# at every boot.
 - name: Enable wake service
   ansible.builtin.systemd:
     name: set-wake.service
     enabled: true
-    state: started

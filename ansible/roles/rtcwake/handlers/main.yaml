@@ -1,0 +1,13 @@
+---
+# Handlers run in the order listed here, so systemd picks up a changed
+# unit file before the service is run.
+- name: Reload systemd
+  ansible.builtin.systemd:
+    daemon_reload: true
+
+# restarted, not started: a oneshot that already ran is inactive, and
+# restarting it runs it again, re-arming the alarm with the new script.
+- name: Run set-wake
+  ansible.builtin.systemd:
+    name: set-wake.service
+    state: restarted
