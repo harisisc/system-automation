@@ -1,0 +1,56 @@
+#cloud-config
+# VM variant of autoinstall.yaml.template, for test VMs with small disks.
+# Identical except for storage: (no LUKS, automatic layout). Keep the rest
+# in sync with autoinstall.yaml.template when changing either.
+autoinstall:
+  version: 1
+
+  locale: en_US.UTF-8
+  keyboard:
+    layout: us
+  # Keep in sync with system_timezone in ../ansible's group_vars.
+  timezone: America/New_York
+
+  identity:
+    hostname: ubuntu
+    username: ubuntu
+    # Shared, hardcoded default password ("changeme") - this account is
+    # only a placeholder for install; Ansible creates the real users and
+    # removes this one at bootstrap, and ../ansible connects as its own
+    # key-only "ansible" service account below.
+    password: "$6$7Bpi1korzyYkEumk$/y6Wf/x9G2WF8wul.HOs7Rgy5Ku.yPn7qE9wYanoA7IV11WoIzcZ4R1XY2e3jDxMGskfg5UNQdj.LaqMV0TfJ."
+
+  ssh:
+    install-server: true
+    allow-pw: true
+    authorized-keys:
+      - __ANSIBLE_SSH_PUBLIC_KEY__
+
+  # VM layout: the installer's automatic LVM layout on the largest disk,
+  # no encryption, root LV using the whole disk. Works on any disk size,
+  # unlike the main template's fixed 100G / + 300G /home.
+  storage:
+    layout:
+      name: lvm
+      sizing-policy: all
+
+  packages:
+    - openssh-server
+    - python3
+    - python3-apt
+    - sudo
+
+  user-data:
+    users:
+      - name: ansible
+        gecos: Ansible Service Account
+        groups:
+          - sudo
+        shell: /bin/bash
+        sudo: ALL=(ALL) NOPASSWD:ALL
+        lock_passwd: true
+        ssh_authorized_keys:
+          - __ANSIBLE_SSH_PUBLIC_KEY__
+
+  late-commands:
+    - curtin in-target -- systemctl enable ssh

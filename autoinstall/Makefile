@@ -1,4 +1,4 @@
-.PHONY: autoinstall iso clean help
+.PHONY: autoinstall iso autoinstall-vm iso-vm clean help
 
 .DEFAULT_GOAL := help
 
@@ -12,6 +12,11 @@ SOURCE_ISO ?=
 OUTPUT_ISO ?= $(BUILD_DIR)/ubuntu-autoinstall.iso
 VOLUME_ID ?= ubuntu-autoinstall
 
+# VM variant: no disk encryption, automatic layout (any disk size).
+VM_TEMPLATE := autoinstall-vm.yaml.template
+VM_OUTPUT := $(BUILD_DIR)/autoinstall-vm.yaml
+VM_ISO := $(BUILD_DIR)/ubuntu-autoinstall-vm.iso
+
 autoinstall: ## Render build/autoinstall.yaml from the template
 	@AUTOINSTALL_TEMPLATE="$(AUTOINSTALL_TEMPLATE)" \
 	AUTOINSTALL_OUTPUT="$(AUTOINSTALL_OUTPUT)" \
@@ -24,6 +29,15 @@ iso: autoinstall ## Build build/ubuntu-autoinstall.iso from SOURCE_ISO + the ren
 	OUTPUT_ISO="$(OUTPUT_ISO)" \
 	VOLUME_ID="$(VOLUME_ID)" \
 	scripts/build_iso.sh
+
+autoinstall-vm: ## Render build/autoinstall-vm.yaml from the VM template
+	@$(MAKE) --no-print-directory autoinstall \
+		AUTOINSTALL_TEMPLATE="$(VM_TEMPLATE)" AUTOINSTALL_OUTPUT="$(VM_OUTPUT)"
+
+iso-vm: ## Build build/ubuntu-autoinstall-vm.iso (no encryption, auto layout) for VMs
+	@$(MAKE) --no-print-directory iso \
+		AUTOINSTALL_TEMPLATE="$(VM_TEMPLATE)" AUTOINSTALL_OUTPUT="$(VM_OUTPUT)" \
+		OUTPUT_ISO="$(VM_ISO)"
 
 clean: ## Remove the build/ directory
 	rm -rf "$(BUILD_DIR)"
