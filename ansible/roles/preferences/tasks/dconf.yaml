@@ -1,0 +1,30 @@
+---
+# Shared setup for the dconf system defaults written by the other task
+# files (location.yaml, power.yaml). Each of those drops a keyfile into
+# /etc/dconf/db/local.d/ and notifies "Update dconf databases".
+
+- name: Ensure dconf is installed
+  ansible.builtin.apt:
+    name: dconf-cli
+    state: present
+
+# Without a "user" profile, dconf only reads each user's own database and
+# never sees the system defaults. Ubuntu doesn't ship one.
+- name: Configure dconf user profile to read system defaults
+  ansible.builtin.copy:
+    dest: /etc/dconf/profile/user
+    content: |
+      user-db:user
+      system-db:local
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Update dconf databases
+
+- name: Ensure dconf local defaults directory exists
+  ansible.builtin.file:
+    path: /etc/dconf/db/local.d
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"

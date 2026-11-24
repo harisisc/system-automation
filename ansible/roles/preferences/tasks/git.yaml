@@ -1,0 +1,17 @@
+---
+# Per user: ~/.gitconfig from the user's git: entry in group_vars.
+- name: Require user, git_user_name, and git_user_email
+  ansible.builtin.assert:
+    that:
+      - user | length > 0
+      - git_user_name | length > 0
+      - git_user_email | length > 0
+    fail_msg: Set user, git_user_name, and git_user_email when including the preferences role.
+
+- name: Deploy gitconfig
+  ansible.builtin.template:
+    src: gitconfig.j2
+    dest: "/home/{{ user }}/.gitconfig"
+    owner: "{{ user }}"
+    group: "{{ user }}"
+    mode: "0644"

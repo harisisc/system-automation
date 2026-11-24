@@ -2,6 +2,22 @@
   become: true
 
   tasks:
+    # Set first: rtcwake's wake time and other timers are read in the
+    # system timezone. If it changes, re-run set-wake (a handler from the
+    # rtcwake role, imported below) so the armed alarm moves too.
+    - name: Set system timezone
+      community.general.timezone:
+        name: "{{ system_timezone }}"
+      notify: Run set-wake
+      tags: [timezone]
+
+    # Machine-wide preferences only (location services). Called without a
+    # user, so the role's per-user editor/gitconfig tasks are skipped.
+    - name: Configure system preferences
+      ansible.builtin.import_role:
+        name: preferences
+      tags: [preferences]
+
     # Base software and user creation
     - name: Create configured users
       ansible.builtin.import_role:

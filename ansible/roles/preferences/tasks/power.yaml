@@ -1,0 +1,27 @@
+---
+# GNOME power defaults for every user, as dconf system defaults. Not
+# locked: users can change them in Settings > Power, and anyone who
+# already set them themselves keeps their own values. Needs dconf.yaml
+# first.
+#
+# - Screen turns off after 5 minutes of inactivity (idle-delay). If
+#   automatic screen lock is on, it locks at the same time.
+# - Suspend after 15 minutes idle on battery, 1 hour idle on AC power.
+#   On AC this is also how long Syncthing gets after rtcwake's 20:00
+#   wake before the machine sleeps again.
+- name: Set power defaults
+  ansible.builtin.copy:
+    dest: /etc/dconf/db/local.d/00-power
+    content: |
+      [org/gnome/desktop/session]
+      idle-delay=uint32 300
+
+      [org/gnome/settings-daemon/plugins/power]
+      sleep-inactive-battery-type='suspend'
+      sleep-inactive-battery-timeout=900
+      sleep-inactive-ac-type='suspend'
+      sleep-inactive-ac-timeout=3600
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Update dconf databases

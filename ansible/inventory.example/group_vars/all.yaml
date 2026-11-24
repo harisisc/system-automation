@@ -1,6 +1,10 @@
 ansible_user: ansible
 ansible_ssh_private_key_file: ~/.ssh/ansible_ed25519
 
+# System timezone for every machine. Keep in sync with timezone: in
+# ../autoinstall/autoinstall.yaml.template.
+system_timezone: America/New_York
+
 users:
   - username: jsmith
     fullname: "Jane Smith"

@@ -1,0 +1,5 @@
+---
+# Compiles /etc/dconf/db/local.d/* into the binary database GNOME reads.
+- name: Update dconf databases
+  ansible.builtin.command: dconf update
+  changed_when: true

@@ -5,6 +5,8 @@ autoinstall:
   locale: en_US.UTF-8
   keyboard:
     layout: us
+  # Keep in sync with system_timezone in ../ansible's group_vars.
+  timezone: America/New_York
 
   identity:
     hostname: ubuntu

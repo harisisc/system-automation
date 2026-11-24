@@ -1,0 +1,21 @@
+---
+# Turns GNOME location services on for every user, as a dconf system
+# default. Not locked: a user who switches it off in Settings keeps it
+# off, and anyone who already set it themselves keeps their own value.
+# Needs dconf.yaml first.
+
+- name: Ensure geoclue is installed
+  ansible.builtin.apt:
+    name: geoclue-2.0
+    state: present
+
+- name: Enable location services by default
+  ansible.builtin.copy:
+    dest: /etc/dconf/db/local.d/00-location
+    content: |
+      [org/gnome/system/location]
+      enabled=true
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Update dconf databases
