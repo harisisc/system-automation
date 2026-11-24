@@ -4,7 +4,7 @@
 # install from.
 - name: Install apt packages
   ansible.builtin.apt:
-    name: "{{ apt_packages_list }}"
+    name: "{{ apt_packages_list + apt_packages_extra }}"
     state: present
     update_cache: true
     cache_valid_time: 3600

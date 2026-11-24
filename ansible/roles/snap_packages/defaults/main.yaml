@@ -1,4 +1,10 @@
 ---
+# Extra snaps for specific hosts or groups, installed alongside
+# snap_packages_list. Set this in host_vars/group_vars instead of
+# overriding snap_packages_list, which would replace the whole base list.
+# Same item format: {name: ..., classic: true} (classic is optional).
+snap_packages_extra: []
+
 snap_packages_list:
   - name: chromium
   - name: signal-desktop

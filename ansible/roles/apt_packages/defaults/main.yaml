@@ -1,4 +1,9 @@
 ---
+# Extra packages for specific hosts or groups, installed alongside
+# apt_packages_list. Set this in host_vars/group_vars instead of
+# overriding apt_packages_list, which would replace the whole base list.
+apt_packages_extra: []
+
 apt_packages_list:
   - ca-certificates
   - curl

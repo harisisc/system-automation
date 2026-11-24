@@ -1,0 +1,15 @@
+---
+# Per-host settings: this file applies only to the host of the same name
+# in hosts.yaml. Rename it to match your machine, or delete it if you
+# don't need any per-host settings.
+
+# Installed on this host on top of the shared apt_packages_list (see
+# roles/apt_packages/defaults/main.yaml).
+apt_packages_extra:
+  - htop
+
+# Installed on this host on top of the shared snap_packages_list (see
+# roles/snap_packages/defaults/main.yaml). Same format as that list.
+snap_packages_extra:
+  - name: obsidian
+    classic: true

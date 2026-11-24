@@ -10,4 +10,11 @@
     name: "{{ item.name }}"
     classic: "{{ item.classic | default(false) }}"
     state: present
-  loop: "{{ snap_packages_list }}"
+  loop: "{{ snap_packages_list + snap_packages_extra }}"
+  # The module resolves names via `snap info` and crashes with
+  # "IndexError: list index out of range" when that call fails transiently
+  # (store hiccup, snapd busy) instead of reporting the error. Retry it.
+  register: snap_install
+  until: snap_install is succeeded
+  retries: 3
+  delay: 15
