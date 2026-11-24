@@ -1,2 +1,6 @@
 # Generated artifacts: rendered autoinstall.yaml and built ISOs.
 /build/
+
+# Python bytecode from scripts/render_autoinstall.py.
+__pycache__/
+*.pyc
