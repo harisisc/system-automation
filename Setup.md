@@ -241,5 +241,5 @@ See [`ansible/README.md`](ansible/README.md#run-playbooks) for running a
 slice of it by tag (`--tags users`, `--skip-tags docker`, etc).
 
 The machine is now fully provisioned. Ongoing maintenance after this is
-just `ansible-playbook playbooks/update.yaml` (or `site.yaml`, which
-chains update + provision), on whatever cadence you like.
+just `ansible-playbook playbooks/run_role.yaml -e role_name=system_update
+--limit workstations`, on whatever cadence you like.

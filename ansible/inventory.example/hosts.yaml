@@ -5,13 +5,13 @@ all:
     # template's default hostname and no Tailscale yet. Once
     # bootstrap.yaml has run against one, move it into workstations,
     # keyed by its new hostname - everything else (provision.yaml,
-    # update.yaml) targets workstations, not bootstrap.
+    # system_update) targets workstations, not bootstrap.
     bootstrap:
       hosts:
         192.0.2.10: {}
 
     # Fully set up machines: real hostname, Tailscale connected. This is
-    # what provision.yaml/update.yaml/site.yaml run against.
+    # what provision.yaml and system_update run against.
     workstations:
       hosts:
         example-workstation: {}

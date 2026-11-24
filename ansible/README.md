@@ -52,8 +52,8 @@ with your own machines and users.
   still with the template's default hostname and no Tailscale.
   `playbooks/bootstrap.yaml` targets this group.
 - **`workstations`** — fully set up machines (real hostname, Tailscale
-  connected), identified by hostname instead of IP. `provision.yaml`,
-  `update.yaml`, and `site.yaml` all target this group, not `bootstrap`.
+  connected), identified by hostname instead of IP. `provision.yaml`
+  targets this group, not `bootstrap`.
 
 Once `bootstrap.yaml` has run against a `bootstrap` entry, move it by
 hand: delete its IP-keyed line from `bootstrap.hosts` and add a
@@ -138,31 +138,22 @@ vaulted value.
 
 ## Run Playbooks
 
-`playbooks/site.yaml` builds an entire machine: `update.yaml` (apt/snap/flatpak
-upgrades — the thing you'd run regularly, e.g. on a cron/timer) then
-`provision.yaml` (users, packages, Docker, Syncthing, preferences — the
-thing you mostly only need after a fresh install).
-
-Run the full build:
-
-```sh
-ansible-playbook playbooks/site.yaml
-```
-
-Run just the regular maintenance pass:
-
-```sh
-ansible-playbook playbooks/update.yaml
-```
-
-Run just provisioning:
+`provision.yaml` builds a machine (users, packages, Docker, Syncthing,
+rtcwake — the thing you mostly only need after a fresh install):
 
 ```sh
 ansible-playbook playbooks/provision.yaml
 ```
 
+For the regular maintenance pass (apt/snap/flatpak upgrades), run the
+`system_update` role via `run_role.yaml`:
+
+```sh
+ansible-playbook playbooks/run_role.yaml -e role_name=system_update --limit workstations
+```
+
 `provision.yaml`'s tasks are tagged by concern (`users`, `apt_packages`,
-`snap_packages`, `docker`, `rtcwake`, `syncthing`, `preferences`), so you
+`snap_packages`, `docker`, `rtcwake`, `syncthing`), so you
 can run a slice of it without touching the rest — e.g. to pick up a new
 user you just added to `group_vars/all.yaml` without re-running everything
 else:

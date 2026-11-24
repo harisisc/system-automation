@@ -1,6 +1,7 @@
 ---
-# Full apt upgrades are update.yaml's job (run fleet-wide, independent of
-# this role) - this just keeps the cache fresh enough to install from.
+# Full apt upgrades are the system_update role's job (run fleet-wide,
+# independent of this role) - this just keeps the cache fresh enough to
+# install from.
 - name: Install apt packages
   ansible.builtin.apt:
     name: "{{ apt_packages_list }}"
