@@ -23,15 +23,115 @@ autoinstall:
     authorized-keys:
       - __ANSIBLE_SSH_PUBLIC_KEY__
 
+  # Explicit layout (the `layout: lvm` shortcut can't size individual LVs):
+  # GPT on the largest disk -> 1G ESP, 2G /boot, rest LUKS -> LVM with
+  # / at 100G and /home at 300G. Needs a disk of at least ~410GB; any
+  # space beyond that stays free in ubuntu-vg for growing either LV later
+  # (lvextend -r). UEFI only - there's no BIOS boot partition.
   storage:
-    layout:
-      name: lvm
-      # Default "scaled" policy caps the root LV at 100GB and leaves the
-      # rest of the VG unallocated - give root the whole disk instead.
-      sizing-policy: all
-      # Fixed for now - same passphrase on every install. Change it after
-      # first boot with cryptsetup luksChangeKey (see README).
-      password: "changeme"
+    config:
+      - type: disk
+        id: disk-main
+        match:
+          size: largest
+        ptable: gpt
+        wipe: superblock-recursive
+        preserve: false
+        grub_device: false
+
+      - type: partition
+        id: part-efi
+        device: disk-main
+        number: 1
+        size: 1G
+        flag: boot
+        grub_device: true
+        wipe: superblock
+        preserve: false
+      - type: format
+        id: fmt-efi
+        volume: part-efi
+        fstype: fat32
+        preserve: false
+
+      - type: partition
+        id: part-boot
+        device: disk-main
+        number: 2
+        size: 2G
+        wipe: superblock
+        preserve: false
+      - type: format
+        id: fmt-boot
+        volume: part-boot
+        fstype: ext4
+        preserve: false
+
+      - type: partition
+        id: part-luks
+        device: disk-main
+        number: 3
+        size: -1
+        wipe: superblock
+        preserve: false
+      - type: dm_crypt
+        id: crypt-main
+        volume: part-luks
+        dm_name: dm_crypt-0
+        # Fixed for now - same passphrase on every install. Change it after
+        # first boot with cryptsetup luksChangeKey (see README).
+        key: "changeme"
+        preserve: false
+
+      - type: lvm_volgroup
+        id: vg-main
+        name: ubuntu-vg
+        devices:
+          - crypt-main
+        preserve: false
+
+      - type: lvm_partition
+        id: lv-root
+        volgroup: vg-main
+        name: ubuntu-lv
+        size: 100G
+        wipe: superblock
+        preserve: false
+      - type: format
+        id: fmt-root
+        volume: lv-root
+        fstype: ext4
+        preserve: false
+
+      - type: lvm_partition
+        id: lv-home
+        volgroup: vg-main
+        name: home-lv
+        size: 300G
+        wipe: superblock
+        preserve: false
+      - type: format
+        id: fmt-home
+        volume: lv-home
+        fstype: ext4
+        preserve: false
+
+      - type: mount
+        id: mnt-root
+        device: fmt-root
+        path: /
+      - type: mount
+        id: mnt-boot
+        device: fmt-boot
+        path: /boot
+      - type: mount
+        id: mnt-efi
+        device: fmt-efi
+        path: /boot/efi
+      - type: mount
+        id: mnt-home
+        device: fmt-home
+        path: /home
 
   packages:
     - openssh-server
