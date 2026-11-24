@@ -1,94 +1,134 @@
 # Autoinstall
 
-Generates an Ubuntu `autoinstall.yaml` from
-[`autoinstall.yaml.template`](autoinstall.yaml.template) for unattended OS
-installs. The template creates an `ansible` user during installation
-(key-only SSH auth, passwordless sudo) so `../ansible` has something to
-connect to once the machine boots. The install-time `ubuntu` user gets a
-shared, hardcoded default password (`changeme`) — it's a placeholder for
-initial access, not meant to stay that way; `../ansible` creates your
-real accounts afterward.
-
-Both the `ubuntu` password and the LUKS disk-encryption passphrase are
-currently fixed values hardcoded in the template (`changeme` for both) —
-the same on every install. Change them after first boot (see below);
-rotating these to something per-machine and not sitting in a file is a
-follow-up, not done yet.
+Builds an Ubuntu ISO that installs itself unattended, from
+[`autoinstall.yaml.template`](autoinstall.yaml.template). The installed
+machine has just enough on it for [`../ansible`](../ansible) to connect
+and take over.
 
 Run `make help` (or just `make`) to list available targets.
 
-## Generate an installer config
+## What the Installer Sets Up
+
+**Accounts**
+
+- `ansible`: service account for `../ansible`. SSH key only (its
+  password is locked), passwordless sudo. Its authorized key is the
+  public key you supply when rendering the config (see below).
+- `ubuntu`: install-time placeholder account with password `changeme`.
+  Ansible creates your real accounts and removes this one during
+  bootstrap.
+
+**Hostname**: `ubuntu` on every install. `../ansible`'s bootstrap
+playbook sets the real one.
+
+**SSH**: `openssh-server` installed and enabled. Password login is
+allowed (so `ubuntu`/`changeme` works over SSH until bootstrap removes
+that account), and the Ansible public key is also authorized for
+`ubuntu`.
+
+**Packages**: `openssh-server`, `python3`, `python3-apt`, `sudo`, the
+minimum Ansible needs. Everything else comes from `../ansible`.
+
+**Disk layout**: full disk encryption, with LVM inside it:
+
+```text
+<largest disk>  GPT
+├─p1   1G     fat32  /boot/efi
+├─p2   2G     ext4   /boot
+└─p3   rest   LUKS2 (dm_crypt-0), passphrase "changeme"
+   └─ubuntu-vg
+      ├─ubuntu-lv   100G  ext4  /
+      ├─home-lv     300G  ext4  /home
+      └─(free)      whatever's left
+```
+
+- **It wipes the largest disk attached.** The disk is chosen by size
+  (`match: size: largest`), not by name, so it works the same on
+  `sda`, `vda` or `nvme0n1`. Unplug any external drive larger than the
+  target before installing, or that drive gets wiped instead.
+- **The disk must be at least ~410GB**, or the install fails.
+- **The leftover space stays free in `ubuntu-vg`.** Grow either LV
+  into it later, while it's mounted:
+  `sudo lvextend -r -L +50G /dev/ubuntu-vg/home-lv`.
+- **UEFI only.** There's no BIOS boot partition.
+
+To change sizes, edit the `lvm_partition` entries under
+`storage.config` in the template.
+
+**Placeholder secrets**: the `ubuntu` password and the LUKS passphrase
+are both `changeme`, hardcoded in the template and the same on every
+install. Change both after first boot (see
+[After First Boot](#after-first-boot)). Making these unique per machine
+is a follow-up, not done yet.
+
+## Generate an Installer Config
 
 ```sh
 make autoinstall
 ```
 
-Run interactively (a real terminal, not a script/CI), it prompts for the
-Ansible SSH public key path if it's not already resolvable (defaults to
-`~/.ssh/ansible_ed25519.pub`, just press enter to accept it).
+This writes `build/autoinstall.yaml`, with your Ansible SSH public key
+substituted in. In a real terminal it prompts for the key's path
+(default `~/.ssh/ansible_ed25519.pub`, press enter to accept).
 
-To skip the prompt (CI, scripting), pass it as an env var instead — this
-fails fast rather than prompting if it's still missing:
+For non-interactive runs (CI, scripts), pass the key instead. There's
+no default path here; it fails fast if the key is missing:
 
 ```sh
 ANSIBLE_SSH_PUBLIC_KEY_FILE=~/.ssh/ansible_ed25519.pub make autoinstall
 ```
 
-`ANSIBLE_SSH_PUBLIC_KEY` / `ANSIBLE_SSH_PUBLIC_KEY_FILE` — non-interactive
-runs don't get the `~/.ssh/ansible_ed25519.pub` default, so pass one
-explicitly if it's not that path.
+Or pass the key itself with `ANSIBLE_SSH_PUBLIC_KEY="ssh-ed25519 ..."`.
+Either way the key is checked, and a private key is rejected.
 
-This writes `build/autoinstall.yaml` (the whole `build/` directory is
-gitignored — it contains local credentials and generated binaries).
+`build/` is gitignored. It holds the rendered config and built ISOs.
 
-## Build a bootable ISO
+## Build a Bootable ISO
 
-Download an [Ubuntu live ISO](https://ubuntu.com/download) yourself first
-(server or desktop, not fetched by this repo). Then bake the generated
-`autoinstall.yaml` into it to produce a single ISO that boots straight into
-an unattended install — no separate USB or HTTP server needed:
+Download an [Ubuntu live ISO](https://ubuntu.com/download) yourself
+first (server or desktop, 22.04.3 or newer). Then:
 
 ```sh
 SOURCE_ISO=~/Downloads/ubuntu-24.04.1-live-server-amd64.iso make iso
 ```
 
-`make iso` runs `make autoinstall` first, so the same interactive prompting
-applies. If `SOURCE_ISO` is omitted, `build_iso.sh` prompts for the path
-too; in a non-interactive shell it exits with an error instead of
-guessing.
-
-This runs `make autoinstall` first, then `scripts/build_iso.sh`, which:
-
-1. Renders `build/autoinstall.yaml` itself if it isn't already there (so
-   `scripts/build_iso.sh` also works standalone, without `make autoinstall`
-   first — it just needs the same credential env vars).
-2. Extracts the source ISO.
-3. Adds the rendered `autoinstall.yaml` as `/user-data` (plus an empty
-   `/meta-data`) so the ISO is its own NoCloud data source
-   (`ds=nocloud;s=/cdrom/`).
-4. Patches the GRUB/isolinux boot entries to pass that `autoinstall`
-   kernel parameter automatically.
-5. Repacks the ISO with `xorriso -as mkisofs`, reassembling the same
-   BIOS+UEFI hybrid-GPT boot layout modern Ubuntu ISOs (22.04.3+) ship
-   with. Their UEFI boot image isn't a normal file — it's raw bytes
-   appended to the ISO and referenced by sector offset — so it's pulled
-   out of the source ISO by LBA (from `xorriso -report_el_torito plain`)
-   and re-attached as an appended GPT partition on rebuild. This has been
-   boot-tested in QEMU under both BIOS and UEFI (OVMF).
-
-Output defaults to `build/ubuntu-autoinstall.iso` — override with
-`OUTPUT_ISO`. Write it to a USB drive with:
+If `SOURCE_ISO` is omitted, it prompts for the path (or exits with an
+error in a non-interactive shell). Output goes to
+`build/ubuntu-autoinstall.iso` (override with `OUTPUT_ISO`). Write it to
+a USB drive, replacing `/dev/sdX` with the USB stick's device from
+`lsblk`:
 
 ```sh
 sudo dd if=build/ubuntu-autoinstall.iso of=/dev/sdX bs=4M status=progress conv=fsync
 ```
 
-Requires `xorriso` (`sudo apt install xorriso`). If your source ISO
-doesn't have this BIOS+UEFI hybrid-GPT layout (older releases, or non-Ubuntu
-images), the script exits with an explanation rather than producing a
-possibly-broken ISO.
+Requires `xorriso` (`sudo apt install xorriso`).
 
-## Clean up
+`make iso` runs `make autoinstall` first, so the key prompt above
+applies, then runs `scripts/build_iso.sh`, which:
+
+1. Renders `build/autoinstall.yaml` itself if it's missing, so the
+   script also works standalone (pass the key env var as above).
+2. Extracts the source ISO.
+3. Adds the rendered config as `/user-data` (plus an empty `/meta-data`)
+   so the ISO is its own NoCloud data source.
+4. Adds `autoinstall ds=nocloud;s=/cdrom/` to the GRUB and isolinux boot
+   entries, so the install starts without any keyboard input.
+5. Repacks the ISO with `xorriso`, keeping the BIOS+UEFI hybrid-GPT
+   boot layout that Ubuntu 22.04.3+ ISOs use. The UEFI boot image in
+   those ISOs isn't a normal file; it's raw bytes appended to the ISO.
+   The script copies it out of the source ISO by sector offset and
+   re-attaches it as an appended GPT partition. Boot-tested in QEMU
+   under both BIOS and UEFI (OVMF).
+
+If the source ISO doesn't have that hybrid-GPT layout (older releases,
+non-Ubuntu images), the script exits with an explanation rather than
+producing a possibly broken ISO.
+
+The ISO contains a copy of the config, so rebuild it after any change
+to the template.
+
+## Clean Up
 
 Remove everything generated by `make autoinstall` / `make iso`:
 
@@ -96,20 +136,18 @@ Remove everything generated by `make autoinstall` / `make iso`:
 make clean
 ```
 
-## Change the ubuntu Account's Password
+## After First Boot
 
-Do this on every machine after first boot too — same reasoning as the
-LUKS passphrase below, it's the same default on every install:
+Do both of these on every machine. The defaults are shared by every
+install. [`../Setup.md`](../Setup.md) has the full post-install order.
+
+### Change the ubuntu Account's Password
 
 ```sh
 sudo passwd ubuntu
 ```
 
-## Update a LUKS Passphrase
-
-Do this on every machine after first boot — the passphrase baked into the
-template (`changeme`) is the same on every install and isn't meant to be
-kept.
+### Update a LUKS Passphrase
 
 Find the encrypted partition:
 
@@ -117,29 +155,29 @@ Find the encrypted partition:
 lsblk -f
 ```
 
-Search the output for a device with type `crypto_LUKS` (its LUKS format
-version, e.g. `2`, shows in the next column over) — that's the raw
-partition, not the `dm_crypt-0`-style mapper device nested underneath it.
-Example:
+Look for the device whose type is `crypto_LUKS`. That's the raw
+partition. Don't use the `dm_crypt-0` mapper device nested under it.
+Example from an NVMe laptop:
 
 ```text
-NAME                    FSTYPE      FSVER
-vda3                    crypto_LUKS 2
-└─dm_crypt-0            LVM2_member LVM2 001
+NAME                        FSTYPE      FSVER
+nvme0n1p3                   crypto_LUKS 2
+└─dm_crypt-0                LVM2_member LVM2 001
+  ├─ubuntu--vg-ubuntu--lv   ext4        1.0
+  └─ubuntu--vg-home--lv     ext4        1.0
 ```
 
-Here that's `/dev/vda3`, not `/dev/dm_crypt-0`.
+Here that's `/dev/nvme0n1p3`. The name depends on the disk type:
+`vda3` on a VM, `sda3` on SATA, `nvme0n1p3` on NVMe.
 
-Change the passphrase. Replace `/dev/sdX3` with the encrypted partition from
-`lsblk -f`:
+Change the passphrase, replacing `/dev/nvme0n1p3` with your partition:
 
 ```sh
-sudo cryptsetup luksChangeKey /dev/sdX3
+sudo cryptsetup luksChangeKey /dev/nvme0n1p3
 ```
 
 Optional: test that the new passphrase unlocks the device:
 
 ```sh
-sudo cryptsetup open /dev/sdX3 testunlock
-sudo cryptsetup close testunlock
+sudo cryptsetup open --test-passphrase /dev/nvme0n1p3
 ```
