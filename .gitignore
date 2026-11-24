@@ -1,9 +1,7 @@
-# secrets
+# Repo-wide safety net: never commit secrets, wherever they end up.
+# Directory-specific ignores live in each directory's own .gitignore.
 *.vault
 *.key
 *.pem
 .env
 *.env
-
-__pycache__/
-*.pyc

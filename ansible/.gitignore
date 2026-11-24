@@ -7,15 +7,10 @@
 # Real inventory - hostnames, IPs, real names, avatar photos. Never
 # committed; inventory.example/ (tracked) mirrors its structure with
 # dummy data. See README.md for copying it into place.
-inventory/
+/inventory/
 
-# external installs
-collections/*
-
-!collections/
-!collections/requirements.yaml
-
-roles_external/*
-
-!roles_external/
-!roles_external/requirements.yaml
+# Installed by ansible-galaxy - only the requirements files are tracked.
+/collections/*
+!/collections/requirements.yaml
+/roles_external/*
+!/roles_external/requirements.yaml
