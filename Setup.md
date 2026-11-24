@@ -7,8 +7,9 @@ docs for that piece; this page is just the order to run them in.
 
 Not covered here — deliberately out of scope for a clean install:
 
-- **`preferences`** — not wired into any playbook yet (see
-  [`ansible/TODO.md`](ansible/TODO.md#5-preferences-role-isnt-wired-in)).
+- **`preferences`' per-user editor/gitconfig tasks** — provision only
+  runs its machine-wide part (location services) so far (see
+  [`ansible/TODO.md`](ansible/TODO.md#4-preferences-role-editor-and-gitconfig-tasks-arent-wired-in)).
 
 ## 0. One-time prerequisites (skip if already done)
 
@@ -234,7 +235,10 @@ workstations:
 
 ## 9. Run provision.yaml
 
-Installs the curated apt/snap package lists, rtcwake, Syncthing, Docker
+Sets the system timezone (`system_timezone` in `group_vars`), enables
+location services and sets power defaults (screen off after 5 min;
+suspend after 15 min on battery, 1 hour on AC), installs
+the curated apt/snap package lists, rtcwake, Syncthing, Docker
 (engine + group membership), KVM/libvirt (skipped when the machine is
 itself a VM), and sets avatars/group membership for
 configured users:

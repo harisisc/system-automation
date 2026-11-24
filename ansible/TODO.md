@@ -59,15 +59,7 @@ should show no new run after resume.
 Once fixed, also drop the `util-linux` task (always installed on Ubuntu)
 and `After=network.target` from the role.
 
-## 3. Machines run in UTC, so "20:00" is 20:00 UTC
-
-The autoinstall template doesn't set a timezone, so installed machines
-default to UTC, and `rtcwake_wake_time` is read in UTC. Arnold's alarm
-was confirmed set for `20:00 UTC`. Set `timezone:` in
-`../autoinstall/autoinstall.yaml.template` for new installs, and add an
-Ansible task to set it on existing machines.
-
-## 4. syncthing role follow-ups
+## 3. syncthing role follow-ups
 
 The role currently does a basic install: package, generated config with
 no default folder, GUI port/HTTPS, device name, and the
@@ -100,70 +92,124 @@ another device and accepted by hand. Still to sort out:
 - **Minor:** the install task refreshes the apt cache every run; add
   `cache_valid_time`.
 
-## 5. preferences role isn't wired in
+## 4. preferences role: editor and gitconfig tasks aren't wired in
 
-`roles/preferences` (vim as default editor, `EDITOR`/`VISUAL` in
-`/etc/profile.d`, and a per-user `~/.gitconfig` from each user's `git:`
-entry in `group_vars`) isn't called from any playbook. Its commented-out
-block was removed from `provision.yaml`. Decide whether to wire it back
-in, fold it into other roles, or delete it. Things to look at first:
+`roles/preferences/tasks/main.yaml` only imports `location.yaml`.
+`editor.yaml` (vim as default editor, `EDITOR`/`VISUAL` in
+`/etc/profile.d`) and `git.yaml` (a `~/.gitconfig` from each user's
+`git:` entry in `group_vars`, needs `user`, `git_user_name` and
+`git_user_email`) are in the role but not imported from `main.yaml`
+yet. Decide whether to import them (git per user), fold them into other
+roles, or drop them. Things to look at first:
 
 - **It overwrites `~/.gitconfig` completely**, from a template holding
   only `user.name` and `user.email`, so any other git settings a user
   has are lost on every run. `community.general.git_config` would set
   just those two keys.
 - **`vim` is installed twice.** It's already in `apt_packages_list`.
-- **Editor settings are machine-wide**, not per user, even though the
-  role is run once per user.
+- **`editor.yaml` is machine-wide** and doesn't need a user, so it can
+  be imported unconditionally, like `location.yaml`. `git.yaml` has to
+  run once per user.
 
-## 6. Disk quotas on home directories
+## 5. Disk usage warnings
 
-Add per-user disk quotas on `/home`. Notes for when this is picked up:
+Get warned when `/` or `/home` fills up past a threshold. Not quotas:
+those block writes, and count per user by file owner, which isn't the
+goal. Done through node_exporter (#6) and an alert rule on the existing
+Prometheus, e.g.:
 
-- Only machines installed with the current autoinstall layout have a
-  separate `/home` LV (300G). Older installs have `/home` on `/`, where
-  quotas would cover the whole root filesystem.
-- ext4 options: enable the built-in quota feature on the filesystem
-  (`tune2fs -O quota`, needs it unmounted), or mount with `usrquota`.
-  Then set limits per user with `setquota` (from the `quota` package).
-- Decide where limits live, e.g. a `quota:` entry per user in
-  `group_vars`, alongside `syncthing:`.
+```promql
+# over 85% full for 15 minutes
+(1 - node_filesystem_avail_bytes{mountpoint=~"/|/home", fstype="ext4"}
+   / node_filesystem_size_bytes{mountpoint=~"/|/home", fstype="ext4"}) * 100 > 85
 
-## 7. Install node_exporter
+# on track to fill within 7 days, based on the last 6 hours
+predict_linear(node_filesystem_avail_bytes{mountpoint=~"/|/home", fstype="ext4"}[6h], 7*24*3600) < 0
+```
 
-Install Prometheus `node_exporter` on the workstations for monitoring.
-Notes for when this is picked up:
+A sleeping machine sends no data, so these don't fire while it's
+suspended. Machines installed before the 100G / + 300G /home layout only
+have `/`.
 
-- Ubuntu packages it as `prometheus-node-exporter`. The
-  `prometheus.prometheus` collection also has a `node_exporter` role, if
-  more control over version and flags is needed.
-- It listens on port 9100 on all interfaces by default, with no auth.
-  Consider binding it to the Tailscale address only, or firewalling it.
+## 6. Install node_exporter
 
-## 8. System-wide settings: timezone, location, power
+Install Prometheus `node_exporter` for monitoring. Ubuntu packages it as
+`prometheus-node-exporter`; installing it enables and starts the
+service, so adding it to `apt_packages_list` alone would work, but
+leaves it open (see below). The `prometheus.prometheus` collection also
+has a `node_exporter` role, if more control over version and flags is
+needed.
 
-Set machine-wide defaults from Ansible instead of by hand on each
-machine. Probably a new role (e.g. `system_settings`) in `provision.yaml`.
+**Security concerns:**
 
-- **Timezone.** `community.general.timezone`. Fixes #3 on existing
-  machines. Also set `timezone:` in the autoinstall template for new
-  installs.
-- **Location.** GNOME location services on/off, and regional formats
-  (`locale`, e.g. date and number formats). Decide which of these is
-  meant.
-- **Power.** GNOME auto-suspend timeouts (on AC / on battery), screen
-  blank, and lid behaviour. These interact with rtcwake (#2): after the
-  20:00 wake, auto-suspend decides how long Syncthing gets before the
-  machine sleeps again.
+- **Open to the whole network, no auth.** By default it listens on port
+  9100 on every interface. Anyone on the same LAN, or on any network a
+  laptop joins (hotel or café Wi-Fi), can read `/metrics`.
+- **What it reveals.** Not secrets, but useful reconnaissance: hostname,
+  kernel and package versions, mounted filesystems, network interfaces
+  and addresses, running systemd units.
+- **Binding to the Tailscale address is fragile.** node_exporter can
+  start before Tailscale is connected, and then fails to start. Prefer
+  a firewall rule.
+- **Extra collectors come with it.** apt installs recommends, so
+  `prometheus-node-exporter-collectors` is pulled in, with systemd
+  timers running things like `smartctl` and apt checks as root. Use
+  `install_recommends: false` unless those metrics are wanted.
+- **Every host running it is another listening service** to keep
+  patched and firewalled.
 
-The GNOME settings are per user by default. To set them machine-wide,
-use dconf system defaults (`/etc/dconf/db/local.d/` plus `dconf
-update`), with locks in `locks/` for anything users shouldn't change.
+**Plan:**
 
-## 9. Syncthing exporter proxy
+- A small `node_exporter` role, opt-in per host
+  (`node_exporter_enabled: true` in `host_vars`).
+- ufw rule allowing 9100 only from Tailscale (`100.64.0.0/10`), and
+  scrape over Tailscale, so it doesn't matter which network a machine
+  is on.
+- Start with always-on machines (desktops, KVM hosts). Leave laptops
+  out until there's a reason.
+
+Prometheus and Grafana already run elsewhere. Disk usage alerts (#5)
+build on this. Machines suspend nightly (#7 power settings), so a "host
+down" alert has to allow for expected sleep.
+
+## 7. [IN TESTING] System-wide settings: timezone, location, power
+
+Implemented, not yet tested on a real machine:
+
+- **Timezone.** Fixed `America/New_York` everywhere: `system_timezone`
+  in `group_vars`, set by the first task in `provision.yaml` (tag
+  `timezone`), and `timezone:` in the autoinstall template. A change
+  re-runs rtcwake's `Run set-wake` handler so the armed alarm moves.
+- **Location services.** Enabled by default (not locked) via dconf in
+  the `preferences` role (`location.yaml`).
+- **Power.** Via dconf in the `preferences` role (`power.yaml`): screen
+  off after 5 min, suspend after 15 min idle on battery and 1 hour on
+  AC. After rtcwake's 20:00 wake (#2), Syncthing gets about an hour on
+  AC before the machine sleeps again.
+
+To test on one machine:
+
+```sh
+ansible-playbook playbooks/provision.yaml --tags timezone,preferences --limit <host>
+```
+
+- `timedatectl` shows `America/New_York`, and
+  `date -d @$(cat /sys/class/rtc/rtc0/wakealarm)` shows 20:00 local.
+- As a user on that machine, `gsettings get org.gnome.system.location
+  enabled` is `true`, and `gsettings get
+  org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout` is
+  `3600`.
+- A fresh install from a rebuilt ISO comes up in `America/New_York`.
+
+Left for later: regional formats (`locale`), lid behaviour, the login
+screen's own power settings (GDM has its own dconf profile, so these
+defaults don't apply there), automatic timezone on laptops only, and
+moving the timezone task into the `preferences` role.
+
+## 8. Syncthing exporter proxy
 
 Expose each user's Syncthing metrics to Prometheus, alongside
-node_exporter (#7). Notes for when this is picked up:
+node_exporter (#6). Notes for when this is picked up:
 
 - Syncthing's GUI/API is bound to `127.0.0.1` on a per-user port
   (`syncthing.port` in `group_vars`, e.g. 8384, 8385) with HTTPS, and
@@ -179,3 +225,14 @@ node_exporter (#7). Notes for when this is picked up:
 - Same exposure concern as node_exporter: bind to the Tailscale
   address or firewall it, since the API key grants full control of
   that user's Syncthing.
+
+## 9. Avatar tasks report "changed" on every run
+
+The avatar part of the `users` role resizes each user's picture on the
+control machine, uploads it, and calls AccountsService's `SetIconFile`
+on every run, all marked changed (`changed_when: true` / temp files). So
+a provision run with nothing to do still shows 5 changed tasks
+(confirmed on `testbox`). Only set the icon when it actually differs,
+e.g. compare a checksum of the resized image with the one recorded last
+time, or with the file AccountsService already holds under
+`/var/lib/AccountsService/icons/<user>`.

@@ -170,7 +170,7 @@ For the regular maintenance pass (apt/snap/flatpak upgrades), run the
 ansible-playbook playbooks/run_role.yaml -e role_name=system_update --limit workstations
 ```
 
-`provision.yaml`'s tasks are tagged by concern (`users`, `apt_packages`,
+`provision.yaml`'s tasks are tagged by concern (`timezone`, `preferences`, `users`, `apt_packages`,
 `snap_packages`, `docker`, `rtcwake`, `syncthing`, `kvmhosts`), so you
 can run a slice of it without touching the rest — e.g. to pick up a new
 user you just added to `group_vars/all.yaml` without re-running everything
