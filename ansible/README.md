@@ -46,6 +46,10 @@ cp -r inventory.example inventory
 Then edit `inventory/hosts.yaml` and `inventory/group_vars/all.yaml`
 with your own machines and users.
 
+Settings for a single machine go in `inventory/host_vars/<hostname>.yaml`.
+The example's `host_vars/example-workstation.yaml` adds extra packages
+for that one host with `apt_packages_extra` and `snap_packages_extra`.
+
 `inventory/hosts.yaml` has two groups, reflecting a machine's lifecycle:
 
 - **`bootstrap`** — freshly autoinstalled machines, reachable only by IP,
@@ -74,6 +78,20 @@ at a time:
 ```sh
 ansible-playbook playbooks/bootstrap.yaml --limit 192.168.1.91
 ```
+
+Before changing anything, it checks that it's pointed at the right
+machine:
+
+- **Exactly one host**, or it stops.
+- **Freshly installed only.** The target must still have the
+  autoinstall template's `ubuntu` hostname and `ubuntu` account.
+  Bootstrap changes both, so an already bootstrapped machine is refused,
+  whichever inventory or directory you ran from. To bootstrap one on
+  purpose anyway, pass `-e bootstrap_force=true`.
+- **Typed confirmation.** It shows the target's current hostname and IP
+  and the hostname it's about to set, and you have to type that new
+  hostname to continue. Without a terminal to answer (CI, piped input)
+  it stops.
 
 Tagged the same way as `provision.yaml`, by concern (`users`,
 `system_update`, `hostname`, `tailscale`), if you want to re-run just one
@@ -139,7 +157,7 @@ vaulted value.
 ## Run Playbooks
 
 `provision.yaml` builds a machine (users, packages, Docker, Syncthing,
-rtcwake — the thing you mostly only need after a fresh install):
+rtcwake, KVM/libvirt — the thing you mostly only need after a fresh install):
 
 ```sh
 ansible-playbook playbooks/provision.yaml
@@ -153,7 +171,7 @@ ansible-playbook playbooks/run_role.yaml -e role_name=system_update --limit work
 ```
 
 `provision.yaml`'s tasks are tagged by concern (`users`, `apt_packages`,
-`snap_packages`, `docker`, `rtcwake`, `syncthing`), so you
+`snap_packages`, `docker`, `rtcwake`, `syncthing`, `kvmhosts`), so you
 can run a slice of it without touching the rest — e.g. to pick up a new
 user you just added to `group_vars/all.yaml` without re-running everything
 else:

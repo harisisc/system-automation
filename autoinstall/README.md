@@ -57,7 +57,8 @@ To change sizes, edit the `lvm_partition` entries under
 
 **Placeholder secrets**: the `ubuntu` password and the LUKS passphrase
 are both `changeme`, hardcoded in the template and the same on every
-install. Change both after first boot (see
+install. Always change the LUKS passphrase after first boot. The
+`ubuntu` account goes away at bootstrap (see
 [After First Boot](#after-first-boot)). Making these unique per machine
 is a follow-up, not done yet.
 
@@ -138,10 +139,14 @@ make clean
 
 ## After First Boot
 
-Do both of these on every machine. The defaults are shared by every
-install. [`../Setup.md`](../Setup.md) has the full post-install order.
+The defaults are shared by every install. [`../Setup.md`](../Setup.md)
+has the full post-install order.
 
 ### Change the ubuntu Account's Password
+
+Only needed if the machine will sit for a while before you run
+`../ansible`'s bootstrap playbook, which deletes this account. Until
+then, `ubuntu`/`changeme` works at the console and over SSH.
 
 ```sh
 sudo passwd ubuntu

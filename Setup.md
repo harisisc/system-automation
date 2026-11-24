@@ -7,11 +7,8 @@ docs for that piece; this page is just the order to run them in.
 
 Not covered here — deliberately out of scope for a clean install:
 
-- **`kvmhosts`** (libvirt/QEMU/GNOME Boxes) — opt-in, bare-metal only
-  (nested virtualization makes it pointless to test in a VM), run by hand
-  afterward with `ansible-playbook playbooks/run_role.yaml -e role_name=kvmhosts`.
-- **`preferences`** — still being tweaked, commented out in
-  `provision.yaml`.
+- **`preferences`** — not wired into any playbook yet (see
+  [`ansible/TODO.md`](ansible/TODO.md#5-preferences-role-isnt-wired-in)).
 
 ## 0. One-time prerequisites (skip if already done)
 
@@ -127,9 +124,12 @@ for details (public key prompting, requirements, etc).
 Boot the target machine from the USB drive. The install is fully
 unattended — it creates an `ansible` user (key-only SSH, passwordless
 sudo) and a `ubuntu` user with a shared placeholder password
-(`changeme`), for initial console access only. LUKS disk encryption is
-also enabled with that same shared placeholder passphrase. Both get
-replaced in step 6.
+(`changeme`), which works at the console and over SSH. The disk is fully
+encrypted (LUKS, same `changeme` placeholder passphrase) with LVM inside:
+100G `/` and 300G `/home`. It wipes the **largest** attached disk, which
+must be at least ~410GB; see
+[`autoinstall/README.md`](autoinstall/README.md#what-the-installer-sets-up).
+Both placeholders get replaced in step 6.
 
 Once it reboots, note the machine's LAN IP (check your router's DHCP
 client list, or `ping ubuntu.local`).
@@ -164,7 +164,9 @@ ansible-playbook playbooks/bootstrap.yaml --limit 192.168.1.91
 
 Prompts for the machine's hostname and a shared initial password for the
 configured accounts. That password isn't stored anywhere and each
-account is forced to change it at first login. See
+account is forced to change it at first login. It then shows the target
+and asks you to type the new hostname again before changing anything,
+and refuses any machine that isn't freshly installed. See
 [`ansible/README.md`](ansible/README.md#bootstrap-a-freshly-installed-machine)
 for the full explanation.
 
@@ -180,7 +182,7 @@ initial password from step 4. Linux will immediately prompt you to set a
 real password (that's `passwd --expire` from bootstrap.yaml kicking in) —
 set it there.
 
-## 6. Set the real LUKS passphrase and retire the ubuntu account's password
+## 6. Set the real LUKS passphrase
 
 Still at the console (or over SSH, this part has no race-condition
 concern):
@@ -190,15 +192,18 @@ lsblk -f
 ```
 
 Search the output for a device with type `crypto_LUKS` — that's the raw
-partition (e.g. `/dev/vda3`), not the `dm_crypt-0`-style mapper device
+partition (e.g. `/dev/vda3` on a VM, `/dev/nvme0n1p3` on an NVMe laptop),
+not the `dm_crypt-0`-style mapper device
 nested underneath it. See
 [`autoinstall/README.md`](autoinstall/README.md#update-a-luks-passphrase)
 for an example.
 
 ```sh
 sudo cryptsetup luksChangeKey /dev/vda3
-sudo passwd ubuntu
 ```
+
+There's no `ubuntu` password to change: bootstrap (step 4) already
+deleted that account.
 
 See [`autoinstall/README.md`](autoinstall/README.md#update-a-luks-passphrase)
 for the optional unlock-test step.
@@ -230,7 +235,8 @@ workstations:
 ## 9. Run provision.yaml
 
 Installs the curated apt/snap package lists, rtcwake, Syncthing, Docker
-(engine + group membership), and sets avatars/group membership for
+(engine + group membership), KVM/libvirt (skipped when the machine is
+itself a VM), and sets avatars/group membership for
 configured users:
 
 ```sh
