@@ -9,4 +9,10 @@ node_exporter_port: 9100
 # Who may scrape it. Prometheus runs on conglomerate and scrapes over
 # Tailscale, so the default is the whole tailnet range. Set this to
 # conglomerate's Tailscale IP (e.g. "100.x.y.z") to allow only it.
+#
+# This ufw rule is the only thing limiting access: node_exporter has no
+# auth and listens on all interfaces, and its metrics reveal hostname,
+# kernel and package versions, filesystems, network interfaces and
+# running units. Binding it to the Tailscale address instead is fragile
+# (it can start before Tailscale is up and fail).
 node_exporter_allow_from: "{{ ufw_tailscale_cidr | default('100.64.0.0/10') }}"

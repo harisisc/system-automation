@@ -53,7 +53,7 @@ removes the old `set-wake` files and clears the alarm they armed.
 - [x] Role rewritten and run on `testbox` (timer enabled, next run
   20:00, old units gone) and on `arnold` (provisioned 2026-11-24 15:22).
 - [x] Timer fires: on `arnold`, "Woke for daily sync" at 20:00:12 on
-  2026-11-24. But `arnold` was awake then (it never suspended, see #7),
+  2026-11-24. But `arnold` was awake then (it never suspended, see #6),
   so this didn't test waking.
 - [ ] **Wake from suspend.** Running now: `arnold` was left at the login
   screen at 20:09 on 2026-11-24, so it should idle-suspend around 21:10
@@ -157,55 +157,37 @@ roles, or drop them. Things to look at first:
   be imported unconditionally, like `location.yaml`. `git.yaml` has to
   run once per user.
 
-## 5. Disk usage warnings
+## 5. Prometheus: scrape node_exporter and alert on disk usage
 
-Get warned when `/` or `/home` fills up past a threshold. Not quotas:
-those block writes, and count per user by file owner, which isn't the
-goal. Done through node_exporter (#6) and an alert rule on the existing
-Prometheus, e.g.:
+node_exporter is installed by `roles/node_exporter` on hosts with
+`node_exporter_enabled: true` in `host_vars` (running on `testbox`). The
+rest happens on the Prometheus side, on `conglomerate`:
 
-```promql
-# over 85% full for 15 minutes
-(1 - node_filesystem_avail_bytes{mountpoint=~"/|/home", fstype="ext4"}
-   / node_filesystem_size_bytes{mountpoint=~"/|/home", fstype="ext4"}) * 100 > 85
-
-# on track to fill within 7 days, based on the last 6 hours
-predict_linear(node_filesystem_avail_bytes{mountpoint=~"/|/home", fstype="ext4"}[6h], 7*24*3600) < 0
-```
-
-A sleeping machine sends no data, so these don't fire while it's
-suspended. Machines installed before the 100G / + 300G /home layout only
-have `/`.
-
-## 6. [IN TESTING] Install node_exporter
-
-Done: `roles/node_exporter`, opt-in per host (`node_exporter_enabled:
-true` in `host_vars`). It installs Ubuntu's `prometheus-node-exporter`
-without recommends (no `prometheus-node-exporter-collectors` timers
-running `smartctl`/apt checks as root), and adds a ufw rule allowing
-9100/tcp only from `node_exporter_allow_from` (default: the Tailscale
-range). Setting it back to false removes the rule and the package.
-Tested on `testbox`: metrics served locally, 9100 blocked from the LAN,
-second run unchanged, disabling cleans up.
-
-Still to do:
-
-- **Scrape it from Prometheus on `conglomerate`.** Needs the host on
-  Tailscale (`sudo tailscale up`), then the host's Tailscale name/IP and
-  port 9100 added as a target in Prometheus.
+- **Scrape it.** The host needs to be on Tailscale, then add its
+  Tailscale name/IP and port 9100 as a target in Prometheus.
 - **Narrow `node_exporter_allow_from`** to conglomerate's Tailscale IP
-  instead of the whole tailnet range.
-- **Disk usage alerts (#5)** build on this.
-- Machines suspend nightly (#7 power settings), so a "host down" alert
-  has to allow for expected sleep.
+  instead of the whole tailnet range, once scraping works (`host_vars` or
+  `group_vars`).
+- **Disk usage alerts.** Get warned when `/` or `/home` fills up past a
+  threshold. Not quotas: those block writes, and count per user by file
+  owner, which isn't the goal. Alert rules, e.g.:
 
-Security notes, for reference: node_exporter has no auth and listens on
-all interfaces, so the ufw rule is the only thing limiting access. The
-metrics reveal hostname, kernel and package versions, filesystems,
-network interfaces and running units. Binding it to the Tailscale
-address instead is fragile (it can start before Tailscale and fail).
+  ```promql
+  # over 85% full for 15 minutes
+  (1 - node_filesystem_avail_bytes{mountpoint=~"/|/home", fstype="ext4"}
+     / node_filesystem_size_bytes{mountpoint=~"/|/home", fstype="ext4"}) * 100 > 85
 
-## 7. [IN TESTING] System-wide settings: timezone, location, power
+  # on track to fill within 7 days, based on the last 6 hours
+  predict_linear(node_filesystem_avail_bytes{mountpoint=~"/|/home", fstype="ext4"}[6h], 7*24*3600) < 0
+  ```
+
+  Machines installed before the 100G / + 300G /home layout only have
+  `/`.
+- **Expect nightly sleep.** A suspended machine sends no data, so alerts
+  don't fire while it sleeps, and a "host down" alert has to allow for
+  it (see #6 power settings).
+
+## 6. [IN TESTING] System-wide settings: timezone, location, power
 
 Timezone is the first task in `provision.yaml` (tag `timezone`,
 `system_timezone` in `group_vars`) and `timezone:` in the autoinstall
@@ -256,10 +238,10 @@ To re-run on one machine:
 ansible-playbook playbooks/provision.yaml --tags timezone,preferences --limit <host>
 ```
 
-## 8. Syncthing exporter proxy
+## 7. Syncthing exporter proxy
 
 Expose each user's Syncthing metrics to Prometheus, alongside
-node_exporter (#6). Notes for when this is picked up:
+node_exporter (#5). Notes for when this is picked up:
 
 - Syncthing's GUI/API is bound to `127.0.0.1` on a per-user port
   (`syncthing.port` in `group_vars`, e.g. 8384, 8385) with HTTPS, and
