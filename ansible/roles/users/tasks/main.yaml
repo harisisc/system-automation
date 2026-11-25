@@ -37,6 +37,33 @@
   when: user_password | length > 0 and item.rc != 0
   changed_when: true
 
+# A key per user per machine, for SSH and GitHub etc. Public keys are
+# copied to where they're needed by hand. Only created when the user has
+# no ~/.ssh/id_ed25519 yet; an existing key is never replaced. No
+# passphrase (it can't be typed in unattended); add one later with
+# `ssh-keygen -p` if wanted. The comment says which machine it's from,
+# using bootstrap's new hostname when it's set (bootstrap runs this
+# before renaming the machine). ~/.ssh isn't synced (.stignore ignores
+# /.*), so each machine keeps its own key.
+- name: Create each user's SSH key for this machine
+  ansible.builtin.user:
+    name: "{{ item.username }}"
+    generate_ssh_key: true
+    ssh_key_type: ed25519
+    ssh_key_file: .ssh/id_ed25519
+    ssh_key_comment: "{{ item.username }}@{{ target_hostname | default(ansible_facts['hostname']) | trim }}"
+  loop: "{{ users }}"
+  loop_control:
+    label: "{{ item.username }}"
+  register: users_ssh_keys
+
+- name: Show newly created SSH public keys
+  ansible.builtin.debug:
+    msg: "{{ item.ssh_public_key }}"
+  loop: "{{ users_ssh_keys.results | selectattr('changed') | list }}"
+  loop_control:
+    label: "{{ item.item.username }}"
+
 # Optional per-user - avatars are real photos, so they're never committed
 # (inventory/group_vars/avatars/ is gitignored). Drop <username>.png in
 # users_avatar_dir (see defaults) yourself; users without a file there are

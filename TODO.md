@@ -185,11 +185,10 @@ node_exporter (#3). Notes for when this is picked up:
 
 ## 6. SSH key management
 
-- **Manage user keys.** Nothing in the playbooks manages users' SSH
-  keys (`~/.ssh/authorized_keys`) today. Decide whether the
-  `users` role should manage them from the inventory (e.g. an
-  `ssh_keys:` list per user in `group_vars`), and whether it should
-  only add keys or also remove ones that aren't listed.
+Per-user, per-machine keys are done: the `users` role creates
+`~/.ssh/id_ed25519` (`<user>@<hostname>`) when missing, and public keys
+are copied where needed by hand. Still to do:
+
 - **Back up the Ansible key.** Every machine's `ansible` account only
   accepts `~/.ssh/ansible_ed25519` from the control machine
   (`ansible_ssh_private_key_file` in `group_vars`). If that key is lost,
@@ -197,3 +196,14 @@ node_exporter (#3). Notes for when this is picked up:
   hand. Decide where a backup copy lives (e.g. a password manager or an
   encrypted offline copy) and how to replace the key if it's ever
   exposed.
+- **Ansible doesn't check host keys.** `ansible/ansible.cfg` has
+  `host_key_checking = False`, so Ansible connects to whatever machine
+  answers to a name, without noticing if it isn't the one in
+  `known_hosts`. Seen on 2026-11-25: after testbox was reinstalled, plain
+  `ssh` refused it (host key changed) while Ansible ran against it
+  without a word. Handy for freshly installed machines, whose keys always
+  change. Consider turning checking back on for `workstations` and
+  leaving it off only for the `bootstrap` group (e.g.
+  `ansible_ssh_common_args` with `StrictHostKeyChecking=accept-new` in
+  that group's vars), plus a way to clear a machine's old entry when it's
+  reinstalled.

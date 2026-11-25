@@ -138,6 +138,17 @@ role resizes it and sets it via AccountsService's own dbus call, since
 GNOME's avatar picker enforces a size limit and won't take a raw photo
 straight from a phone.
 
+## User SSH Keys
+
+The `users` role gives every user their own SSH key on each machine,
+`~/.ssh/id_ed25519`, with a comment of `<username>@<hostname>` so you can
+tell keys apart. It's created only when the user has none, and an
+existing key is never replaced. No passphrase; add one with
+`ssh-keygen -p` if wanted. New public keys are printed in the run's
+output; copy them to GitHub, other machines' `authorized_keys`, and so
+on by hand. `~/.ssh` isn't synced by Syncthing (`.stignore` ignores
+`/.*`), so each machine keeps its own key.
+
 ## Syncthing Ignore Files
 
 Drop `<username>.stignore` into `inventory/group_vars/stignore/` to have
