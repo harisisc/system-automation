@@ -1,34 +1,63 @@
 ---
-- name: Ensure util-linux is installed (rtcwake)
-  ansible.builtin.package:
-    name: util-linux
-    state: present
+# Daily wake from suspend via a systemd timer with WakeSystem=true. The
+# kernel re-arms the RTC alarm on every suspend, so the wake can't get
+# lost after the first night (the old boot-time rtcwake script could).
 
-- name: Install wake script
+- name: Install daily wake service
   ansible.builtin.template:
-    src: set-wake.sh.j2
-    dest: /usr/local/bin/set-wake.sh
+    src: daily-wake.service.j2
+    dest: /etc/systemd/system/daily-wake.service
     owner: root
     group: root
-    mode: '0755'
-  notify: Run set-wake
+    mode: "0644"
+  notify: Reload systemd
 
-- name: Install systemd service
+- name: Install daily wake timer
   ansible.builtin.template:
-    src: set-wake.service.j2
-    dest: /etc/systemd/system/set-wake.service
+    src: daily-wake.timer.j2
+    dest: /etc/systemd/system/daily-wake.timer
     owner: root
     group: root
-    mode: '0644'
+    mode: "0644"
   notify:
     - Reload systemd
-    - Run set-wake
+    - Restart wake timer
 
-# Only enabled here, not started: it's a oneshot, so `state: started`
-# would re-run it (and report "changed") on every provision. The handlers
-# run it once whenever the script or unit actually changes, and it runs
-# at every boot.
-- name: Enable wake service
+# Pick up new unit files before enabling/starting the timer below.
+- name: Apply systemd changes before enabling the timer
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start daily wake timer
+  ansible.builtin.systemd:
+    name: daily-wake.timer
+    enabled: true
+    state: started
+
+# Remove the previous boot-time rtcwake setup (set-wake.service +
+# set-wake.sh) from machines that still have it.
+- name: Check for the old set-wake service
+  ansible.builtin.stat:
+    path: /etc/systemd/system/set-wake.service
+  register: rtcwake_legacy_unit
+
+- name: Disable the old set-wake service
   ansible.builtin.systemd:
     name: set-wake.service
-    enabled: true
+    enabled: false
+  when: rtcwake_legacy_unit.stat.exists
+
+- name: Remove the old set-wake files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/systemd/system/set-wake.service
+    - /usr/local/bin/set-wake.sh
+  notify: Reload systemd
+
+# The old script left an alarm armed in the RTC. Clear it; the timer
+# arms its own on the next suspend.
+- name: Clear the alarm the old script armed
+  ansible.builtin.shell: echo 0 > /sys/class/rtc/rtc0/wakealarm
+  when: rtcwake_legacy_unit.stat.exists
+  changed_when: true

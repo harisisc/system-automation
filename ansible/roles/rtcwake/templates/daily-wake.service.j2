@@ -1,0 +1,9 @@
+# Managed by Ansible (rtcwake role).
+# Started by daily-wake.timer. Waking the machine is the point; the power
+# settings then keep it up long enough for Syncthing to sync.
+[Unit]
+Description=Daily wake for Syncthing
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/logger -t daily-wake "Woke for daily sync"

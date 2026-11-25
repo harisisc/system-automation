@@ -1,0 +1,12 @@
+# Managed by Ansible (rtcwake role).
+[Unit]
+Description=Wake from suspend daily at {{ rtcwake_wake_time }} so Syncthing can sync
+
+[Timer]
+OnCalendar=*-*-* {{ rtcwake_wake_time }}:00
+# Lets the kernel program the RTC alarm for this timer every time the
+# machine suspends, so it wakes for it. Suspend only, not power-off.
+WakeSystem=true
+
+[Install]
+WantedBy=timers.target
