@@ -38,8 +38,10 @@
   changed_when: true
 
 # Optional per-user - avatars are real photos, so they're never committed
-# (inventory/group_vars/avatars/ is gitignored). Drop <username>.png there
-# yourself; users without a file there are just skipped, no error.
+# (inventory/group_vars/avatars/ is gitignored). Drop <username>.png in
+# users_avatar_dir (see defaults) yourself; users without a file there are
+# just skipped, no error. If the directory itself is missing, a message
+# says so, since that usually means the path is wrong.
 #
 # Setting the picture requires AccountsService's own SetIconFile dbus call,
 # not just dropping a file in place:
@@ -54,6 +56,29 @@
 #   itself (root:root, world-readable) and repoints Icon= there - the same
 #   thing GNOME's own "change avatar" UI does. But it also hard-rejects
 #   anything much over ~1MB, so real photos need resizing first.
+- name: Report a missing avatar directory
+  ansible.builtin.debug:
+    msg: >-
+      No avatar directory at {{ users_avatar_dir }}, so no user pictures
+      are set. Override with -e users_avatar_dir=<path> if it's elsewhere.
+  when: users_avatar_dir is not directory
+
+- name: Reset the list of pictures to set
+  ansible.builtin.set_fact:
+    avatar_users_changed: []
+
+- name: Find users with an avatar picture
+  ansible.builtin.set_fact:
+    avatar_users: >-
+      {{ users | map(attribute='username')
+         | intersect(query('ansible.builtin.fileglob', users_avatar_dir ~ '/*.png')
+                     | map('basename') | map('splitext') | map('first')) }}
+
+# From here on, only users whose picture actually changed are touched: the
+# resized image is compared with the copy AccountsService already holds in
+# icons/<user> (SetIconFile stores the file as given). -strip drops the
+# timestamps ImageMagick otherwise embeds, so the same source picture
+# always resizes to the same bytes.
 - name: Create local temp directory for resized avatar images
   ansible.builtin.tempfile:
     state: directory
@@ -62,46 +87,61 @@
   become: false
   register: avatar_tmpdir
   changed_when: false
+  when: avatar_users | length > 0
 
 - name: Resize avatar images to fit AccountsService's icon size limit
   ansible.builtin.command:
-    cmd: convert {{ inventory_dir }}/group_vars/avatars/{{ item.username }}.png -resize 256x256 {{ avatar_tmpdir.path }}/{{ item.username }}.png
+    cmd: convert {{ users_avatar_dir }}/{{ item }}.png -resize 256x256 -strip {{ avatar_tmpdir.path }}/{{ item }}.png
   delegate_to: localhost
   become: false
-  loop: "{{ users }}"
-  when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
-  changed_when: true
+  loop: "{{ avatar_users }}"
+  changed_when: false
+
+- name: Checksum resized avatar images
+  ansible.builtin.stat:
+    path: "{{ avatar_tmpdir.path }}/{{ item }}.png"
+    checksum_algorithm: sha1
+  delegate_to: localhost
+  become: false
+  loop: "{{ avatar_users }}"
+  register: avatar_resized
+
+- name: Checksum each user's current AccountsService icon
+  ansible.builtin.stat:
+    path: /var/lib/AccountsService/icons/{{ item }}
+    checksum_algorithm: sha1
+  loop: "{{ avatar_users }}"
+  register: avatar_current
+
+- name: Work out which users' pictures need setting
+  ansible.builtin.set_fact:
+    avatar_users_changed: >-
+      {{ avatar_users_changed | default([])
+         + ([item.0.item] if item.1.stat.checksum | default('') != item.0.stat.checksum else []) }}
+  loop: "{{ avatar_resized.results | zip(avatar_current.results) | list }}"
+  loop_control:
+    label: "{{ item.0.item }}"
 
 - name: Upload resized avatar images to a remote temp path
   ansible.builtin.copy:
-    src: "{{ avatar_tmpdir.path }}/{{ item.username }}.png"
-    dest: "/tmp/ansible-avatar-{{ item.username }}.png"
+    src: "{{ avatar_tmpdir.path }}/{{ item }}.png"
+    dest: "/tmp/ansible-avatar-{{ item }}.png"
     mode: "0644"
-  loop: "{{ users }}"
-  when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
-
-- name: Look up UID for each user with an avatar (AccountsService's dbus object path is /org/freedesktop/Accounts/User<uid>)
-  ansible.builtin.command: id -u {{ item.username }}
-  loop: "{{ users }}"
-  register: avatar_user_uids
-  changed_when: false
-  when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
+  loop: "{{ avatar_users_changed }}"
 
 - name: Set user login/profile picture via AccountsService's own SetIconFile call
-  ansible.builtin.command: >
+  ansible.builtin.shell: >
     busctl --system call org.freedesktop.Accounts
-    /org/freedesktop/Accounts/User{{ item.stdout | trim }}
-    org.freedesktop.Accounts.User SetIconFile s /tmp/ansible-avatar-{{ item.item.username }}.png
-  loop: "{{ avatar_user_uids.results }}"
-  when: item.stdout is defined
+    /org/freedesktop/Accounts/User$(id -u {{ item }})
+    org.freedesktop.Accounts.User SetIconFile s /tmp/ansible-avatar-{{ item }}.png
+  loop: "{{ avatar_users_changed }}"
   changed_when: true
 
 - name: Remove remote temp avatar files
   ansible.builtin.file:
-    path: "/tmp/ansible-avatar-{{ item.username }}.png"
+    path: "/tmp/ansible-avatar-{{ item }}.png"
     state: absent
-  loop: "{{ users }}"
-  when: (inventory_dir + '/group_vars/avatars/' + item.username + '.png') is file
+  loop: "{{ avatar_users_changed }}"
 
 - name: Remove local temp directory for resized avatar images
   ansible.builtin.file:
@@ -109,3 +149,5 @@
     state: absent
   delegate_to: localhost
   become: false
+  changed_when: false
+  when: avatar_tmpdir.path is defined

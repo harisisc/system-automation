@@ -19,3 +19,8 @@ user_default_groups:
 # new accounts are created locked (no password) - intentional for users
 # added after bootstrap. Set one by hand with `sudo passwd <user>`.
 user_password: ""
+# Where <username>.png avatar pictures are read from, on the control
+# machine. inventory_dir is the folder of the inventory file the host is
+# defined in, so a host defined in a different inventory file (e.g. a
+# one-off test inventory) needs this set with -e.
+users_avatar_dir: "{{ inventory_dir }}/group_vars/avatars"
