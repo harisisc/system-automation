@@ -182,3 +182,18 @@ node_exporter (#3). Notes for when this is picked up:
 - Same exposure concern as node_exporter: bind to the Tailscale
   address or firewall it, since the API key grants full control of
   that user's Syncthing.
+
+## 6. SSH key management
+
+- **Manage user keys.** Nothing in the playbooks manages users' SSH
+  keys (`~/.ssh/authorized_keys`) today. Decide whether the
+  `users` role should manage them from the inventory (e.g. an
+  `ssh_keys:` list per user in `group_vars`), and whether it should
+  only add keys or also remove ones that aren't listed.
+- **Back up the Ansible key.** Every machine's `ansible` account only
+  accepts `~/.ssh/ansible_ed25519` from the control machine
+  (`ansible_ssh_private_key_file` in `group_vars`). If that key is lost,
+  nothing can be provisioned until a new key is put on each machine by
+  hand. Decide where a backup copy lives (e.g. a password manager or an
+  encrypted offline copy) and how to replace the key if it's ever
+  exposed.
