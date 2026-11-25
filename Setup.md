@@ -9,7 +9,7 @@ Not covered here — deliberately out of scope for a clean install:
 
 - **`preferences`' per-user editor/gitconfig tasks** — provision only
   runs its machine-wide part (location services) so far (see
-  [`ansible/TODO.md`](ansible/TODO.md#4-preferences-role-editor-and-gitconfig-tasks-arent-wired-in)).
+  [`ansible/TODO.md`](ansible/TODO.md#2-preferences-role-editor-and-gitconfig-tasks-arent-wired-in)).
 
 ## 0. One-time prerequisites (skip if already done)
 
@@ -174,10 +174,10 @@ and refuses any machine that isn't freshly installed. See
 [`ansible/README.md`](ansible/README.md#bootstrap-a-freshly-installed-machine)
 for the full explanation.
 
-> **Known issue:** SSH password auth isn't disabled yet, so the forced
-> password-change window is technically a race over the network (see
-> [`ansible/TODO.md`](ansible/TODO.md#1-ssh-password-auth-is-a-race-condition-against-the-shared-bootstrap-password)).
-> Until that's fixed, do steps 5–6 at the physical console, not over SSH.
+> **Note:** SSH password auth is left on, so do steps 5–6 at the
+> physical console, not over SSH. Otherwise anyone who knows the shared
+> initial password could log in first and set the account's real
+> password themselves.
 
 ## 5. Log in and set your real password
 

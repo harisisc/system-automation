@@ -1,10 +1,19 @@
 ---
-- name: Enable user lingering for Syncthing user
-  ansible.builtin.command: loginctl enable-linger {{ syncthing_user }}
-  changed_when: false
-
+# syncthing@<user> is a system unit, started at boot without anyone logged
+# in, so it doesn't need lingering. The role leaves lingering alone.
 - name: Enable Syncthing user service
   ansible.builtin.systemd:
     name: syncthing@{{ syncthing_user }}
     enabled: true
     state: started
+  register: syncthing_service_start
+
+# Only when config.xml changed (see config.yaml), and not if the task above
+# has just started it: a fresh start already reads the new config.
+- name: Restart Syncthing to apply config changes
+  ansible.builtin.systemd:
+    name: syncthing@{{ syncthing_user }}
+    state: restarted
+  when:
+    - syncthing_config_changed | bool
+    - not syncthing_service_start.changed

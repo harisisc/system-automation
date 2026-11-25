@@ -59,7 +59,7 @@
       vars:
         syncthing_user: "{{ syncthing_user_config.username }}"
         syncthing_port: "{{ syncthing_user_config.syncthing.port }}"
-        syncthing_directory: "{{ syncthing_user_config.syncthing.directory }}"
+        syncthing_sync_port: "{{ syncthing_user_config.syncthing.sync_port | default(22000) }}"
       tags: [syncthing]
 
     # Installs the engine and adds docker_users to the docker group -

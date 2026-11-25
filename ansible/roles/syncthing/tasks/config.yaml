@@ -1,10 +1,7 @@
 ---
-- name: Stop Syncthing before changing config
-  ansible.builtin.systemd:
-    name: syncthing@{{ syncthing_user }}
-    state: stopped
-  failed_when: false
-
+# config.xml is edited while Syncthing runs; service.yaml restarts it
+# afterwards only if one of these tasks changed something, so a run with
+# nothing to do doesn't interrupt syncing.
 - name: Ensure Syncthing config directory exists
   ansible.builtin.file:
     path: /home/{{ syncthing_user }}/.local/state/syncthing
@@ -20,14 +17,7 @@
     cmd: syncthing generate --no-default-folder --home=/home/{{ syncthing_user }}/.local/state/syncthing
     creates: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
   become_user: "{{ syncthing_user }}"
-
-- name: Ensure configured Syncthing directory exists
-  ansible.builtin.file:
-    path: "{{ syncthing_directory }}"
-    state: directory
-    owner: "{{ syncthing_user }}"
-    group: "{{ syncthing_user }}"
-    mode: "0750"
+  register: syncthing_cfg_generate
 
 # Run as syncthing_user directly (rather than as root + a final recursive
 # chown) so config.xml's ownership is correct from the moment it's written.
@@ -37,6 +27,7 @@
     xpath: /configuration/gui/address
     value: "127.0.0.1:{{ syncthing_port }}"
   become_user: "{{ syncthing_user }}"
+  register: syncthing_cfg_gui_port
 
 - name: Configure Syncthing GUI HTTPS
   community.general.xml:
@@ -45,11 +36,56 @@
     attribute: tls
     value: "true"
   become_user: "{{ syncthing_user }}"
+  register: syncthing_cfg_gui_tls
+
+# Syncthing keeps devices sorted by ID, so the local device isn't
+# necessarily the first one once peers are added. Look up its ID and name
+# exactly that device. Read-only, so it runs for real even under --check.
+- name: Look up this user's local Syncthing device ID
+  ansible.builtin.command:
+    cmd: syncthing --device-id --home=/home/{{ syncthing_user }}/.local/state/syncthing
+  become_user: "{{ syncthing_user }}"
+  register: syncthing_local_device_id
+  changed_when: false
+  check_mode: false
 
 - name: Configure Syncthing device name
   community.general.xml:
     path: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
-    xpath: /configuration/device[1]
+    xpath: /configuration/device[@id='{{ syncthing_local_device_id.stdout | trim }}']
     attribute: name
     value: "{{ ansible_hostname }}-{{ syncthing_user }}"
   become_user: "{{ syncthing_user }}"
+  register: syncthing_cfg_device_name
+
+# Listen on this user's own sync port instead of Syncthing's "default"
+# (TCP and QUIC on 22000, plus relays), so two users' instances on one
+# machine don't fight over 22000. Relays are kept for when no direct
+# connection is possible. Only the listen address changes: folders,
+# devices and files aren't touched. Other devices find the new port
+# through discovery, unless they have this device's address hard-coded.
+- name: Remove other Syncthing listen addresses
+  community.general.xml:
+    path: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
+    xpath: >-
+      /configuration/options/listenAddress[text()!='{{
+      syncthing_listen_addresses | join("' and text()!='") }}']
+    state: absent
+  become_user: "{{ syncthing_user }}"
+  register: syncthing_cfg_listen_remove
+
+- name: Configure Syncthing listen addresses
+  community.general.xml:
+    path: /home/{{ syncthing_user }}/.local/state/syncthing/config.xml
+    xpath: /configuration/options/listenAddress[text()='{{ item }}']
+  loop: "{{ syncthing_listen_addresses }}"
+  become_user: "{{ syncthing_user }}"
+  register: syncthing_cfg_listen_add
+
+- name: Note whether Syncthing's config changed
+  ansible.builtin.set_fact:
+    syncthing_config_changed: >-
+      {{ [syncthing_cfg_generate, syncthing_cfg_gui_port, syncthing_cfg_gui_tls,
+          syncthing_cfg_device_name, syncthing_cfg_listen_remove,
+          syncthing_cfg_listen_add] | selectattr('changed') | list | length > 0 }}
+

@@ -1,0 +1,20 @@
+// Example ~/.stignore for bsmith's Home-bsmith share (the whole home folder).
+// The syncthing role installs <username>.stignore from this directory
+// only when the user has no ~/.stignore yet; an existing one is never
+// changed. The first matching pattern wins, so exceptions (!) go first.
+
+// Dotfile whitelist
+!/.bashrc
+!/.profile
+!/.gitconfig
+!/.vim
+
+// Ignore all dotfiles in the root folder, including Syncthing's own
+// state in .local/state/syncthing (private key, config, database)
+/.*
+
+// Additional ignored root folders
+/snap
+/VMs
+/Scratch
+/Containers

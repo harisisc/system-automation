@@ -1,7 +1,19 @@
 ---
 syncthing_user: ""
 syncthing_port: ""
-syncthing_directory: ""
+# Sync (listen) port for this user's instance, TCP and QUIC. Each user on
+# a machine needs a different one: only one instance can bind a port.
+syncthing_sync_port: 22000
 # Source range allowed to reach Syncthing's sync/discovery ports. Uses the
 # ufw role's LAN range when that's defined.
 syncthing_firewall_from: "{{ ufw_lan_cidr | default('192.168.1.0/24') }}"
+# Written to config.xml in place of "default" (see tasks/config.yaml).
+syncthing_listen_addresses:
+  - "tcp://0.0.0.0:{{ syncthing_sync_port }}"
+  - "quic://0.0.0.0:{{ syncthing_sync_port }}"
+  - "dynamic+https://relays.syncthing.net/endpoint"
+
+# Where <username>.stignore files are read from, on the control machine.
+# Installed to ~/.stignore only when the user has none (tasks/stignore.yaml).
+syncthing_stignore_dir: "{{ inventory_dir }}/group_vars/stignore"
+

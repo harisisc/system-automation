@@ -1,0 +1,39 @@
+---
+# ~/.stignore keeps Syncthing's own state (~/.local/state/syncthing:
+# private key, config, database) and other dotfiles out of the
+# Home-<user> share. Syncthing never syncs it, so it has to be in place
+# before that share is accepted on a new machine.
+#
+# Installed from <syncthing_stignore_dir>/<user>.stignore only when the
+# user has no ~/.stignore yet. An existing one is never changed, even if
+# it differs from the inventory copy: edit it on the machine itself.
+- name: Check for this user's .stignore in the inventory
+  ansible.builtin.stat:
+    path: "{{ syncthing_stignore_dir }}/{{ syncthing_user }}.stignore"
+  delegate_to: localhost
+  become: false
+  register: syncthing_stignore_src
+
+- name: Install .stignore if the user doesn't have one
+  ansible.builtin.copy:
+    src: "{{ syncthing_stignore_dir }}/{{ syncthing_user }}.stignore"
+    dest: /home/{{ syncthing_user }}/.stignore
+    owner: "{{ syncthing_user }}"
+    group: "{{ syncthing_user }}"
+    mode: "0644"
+    force: false
+  when: syncthing_stignore_src.stat.exists
+
+- name: Check whether the user has a .stignore
+  ansible.builtin.stat:
+    path: /home/{{ syncthing_user }}/.stignore
+  register: syncthing_stignore_dest
+
+- name: Warn when the user has no .stignore
+  ansible.builtin.debug:
+    msg: >-
+      {{ syncthing_user }} has no ~/.stignore, and there's none at
+      {{ syncthing_stignore_dir }}/{{ syncthing_user }}.stignore to install.
+      Don't accept the Home-{{ syncthing_user }} share on this machine until
+      one is in place, or Syncthing's own state and every dotfile get synced.
+  when: not syncthing_stignore_dest.stat.exists

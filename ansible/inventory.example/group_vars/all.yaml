@@ -9,8 +9,8 @@ users:
   - username: jsmith
     fullname: "Jane Smith"
     syncthing:
-      port: 8384
-      directory: /home/jsmith
+      port: 8384      # GUI, on 127.0.0.1 only
+      sync_port: 22000 # sync, opened to the LAN; one per user
     git:
       user_name: jsmith
       user_email: jane.smith@example.com
@@ -19,7 +19,7 @@ users:
     fullname: "Bob Smith"
     syncthing:
       port: 8385
-      directory: /home/bsmith
+      sync_port: 22001
 
 docker_users:
    - jsmith

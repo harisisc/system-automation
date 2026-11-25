@@ -1,38 +1,6 @@
 # Known issues
 
-## 1. SSH password auth is a race condition against the shared bootstrap password
-
-`bootstrap.yaml` sets the same typed-in password on every configured
-account, then runs `passwd --expire` to force a change at next login.
-That doesn't close the window it looks like it closes: PAM still accepts
-the shared password over SSH, it just forces a password-change prompt
-*after* authenticating - so anyone who knows the shared password (the
-same one on every bootstrapped machine, until each account's real owner
-gets to it) could SSH in and be the one who sets the account's real
-password, before its intended owner does.
-
-The fix is disabling SSH password authentication entirely, so the first
-login (and forced password change) has to happen at the console instead
-of over the network - real accounts should end up using SSH keys anyway.
-Tried adding this to the `users` role as a drop-in at
-`/etc/ssh/sshd_config.d/00-disable-password-auth.conf` (named to sort
-before any other drop-in, e.g. cloud-init's, since sshd processes
-`Include`d files before the rest of sshd_config and keeps the *first*
-value it sees per directive - confirmed that ordering on a real
-sshd_config: `Include` is on line 24, well before any inline
-`PasswordAuthentication`).
-
-What's unresolved: the task used `validate: /usr/sbin/sshd -t -f %s`,
-which is broken for a minimal drop-in - `sshd -t -f` treats the file as
-a *complete* standalone config, and a fragment with just
-`PasswordAuthentication no` has no `HostKey` directives, so validation
-fails immediately (confirmed: `sshd: no hostkeys available -- exiting`).
-Needs either a different validation approach (e.g. validate against the
-real merged config, not the fragment alone) or dropping `validate`
-entirely and relying on the restart handler failing loudly if the config
-is actually bad.
-
-## 2. [IN TESTING] Daily 20:00 wake from suspend (rtcwake)
+## 1. [IN TESTING] Daily 20:00 wake from suspend (rtcwake)
 
 **Old problem:** `set-wake.sh` ran from `set-wake.service` at boot only,
 so a machine that was suspended rather than rebooted woke on the first
@@ -53,7 +21,7 @@ removes the old `set-wake` files and clears the alarm they armed.
 - [x] Role rewritten and run on `testbox` (timer enabled, next run
   20:00, old units gone) and on `arnold` (provisioned 2026-11-24 15:22).
 - [x] Timer fires: on `arnold`, "Woke for daily sync" at 20:00:12 on
-  2026-11-24. But `arnold` was awake then (it never suspended, see #6),
+  2026-11-24. But `arnold` was awake then (it never suspended, see #4),
   so this didn't test waking.
 - [ ] **Wake from suspend.** Running now: `arnold` was left at the login
   screen at 20:09 on 2026-11-24, so it should idle-suspend around 21:10
@@ -93,52 +61,7 @@ systemctl list-timers daily-wake.timer
 "Woke for daily sync" without a `suspend exit` just before it means the
 machine was already awake.
 
-## 3. syncthing role follow-ups
-
-The role currently does a basic install: package, generated config with
-no default folder, GUI port/HTTPS, device name, and the
-`syncthing@<user>` service. Folders (`Home-<user>`) are shared in from
-another device and accepted by hand. Still to sort out:
-
-- **Two users' instances both want port 22000.** Each user's
-  `syncthing@<user>` uses the default listen address
-  (`tcp://0.0.0.0:22000` + QUIC), so on a machine with two Syncthing
-  users only one can bind it. The other fails to listen on it or picks
-  something else, and with ufw on, anything other than 22000 is
-  blocked from the LAN, so it falls back to relays. Confirmed on
-  `testbox`: `charisis` got 22000, `aharisis` a random port (34569),
-  which ufw blocks from the LAN. Check with
-  `sudo ss -tulnp | grep syncthing`. Fix: a per-user sync port in
-  `group_vars` (like `syncthing.port` for the GUI), written to
-  `config.xml`'s listen address, and opened by
-  `roles/syncthing/tasks/firewall.yaml` instead of the fixed 22000.
-- **`.stignore` is manual.** Each user's `~/.stignore` is written by
-  hand and copied to each machine. Syncthing never syncs it. It's what
-  keeps `~/.local/state/syncthing` (private key, config, database) and
-  other dotfiles out of the `Home-<user>` share, so it must be in place
-  **before** accepting that share on a new machine. Decide how the role
-  should manage it.
-- **Restarts on every run.** "Stop Syncthing before changing config"
-  runs unconditionally and `service.yaml` starts it again, which
-  interrupts syncing and always reports "changed". Replace with a
-  restart that only fires when `config.xml` actually changes. Handlers
-  run once per play, not per loop iteration, so it needs to track which
-  users changed.
-- **Device-name task can rename the wrong device.** It targets
-  `device[1]`, which is only the local device in a freshly generated
-  config. A check-mode run showed it would change a name in
-  `aharisis`'s config on arnold, likely another device. Match on the
-  local device ID instead (`syncthing --device-id --home=...`).
-- **Lingering isn't needed.** `syncthing@<user>` is a system unit
-  (`/usr/lib/systemd/system/syncthing@.service`), so it starts at boot
-  without `loginctl enable-linger`. Drop the task.
-- **`syncthing_directory` is now mostly unused.** It only feeds
-  "Ensure configured Syncthing directory exists" (the home directory,
-  `0750`). Remove it from the role, `provision.yaml` and `group_vars`.
-- **Minor:** the install task refreshes the apt cache every run; add
-  `cache_valid_time`.
-
-## 4. preferences role: editor and gitconfig tasks aren't wired in
+## 2. preferences role: editor and gitconfig tasks aren't wired in
 
 `roles/preferences/tasks/main.yaml` only imports `location.yaml`.
 `editor.yaml` (vim as default editor, `EDITOR`/`VISUAL` in
@@ -157,7 +80,7 @@ roles, or drop them. Things to look at first:
   be imported unconditionally, like `location.yaml`. `git.yaml` has to
   run once per user.
 
-## 5. Prometheus: scrape node_exporter and alert on disk usage
+## 3. Prometheus: scrape node_exporter and alert on disk usage
 
 node_exporter is installed by `roles/node_exporter` on hosts with
 `node_exporter_enabled: true` in `host_vars` (running on `testbox`). The
@@ -185,15 +108,15 @@ rest happens on the Prometheus side, on `conglomerate`:
   `/`.
 - **Expect nightly sleep.** A suspended machine sends no data, so alerts
   don't fire while it sleeps, and a "host down" alert has to allow for
-  it (see #6 power settings).
+  it (see #4 power settings).
 
-## 6. [IN TESTING] System-wide settings: timezone, location, power
+## 4. [IN TESTING] System-wide settings: timezone, location, power
 
 Timezone is the first task in `provision.yaml` (tag `timezone`,
 `system_timezone` in `group_vars`) and `timezone:` in the autoinstall
 templates. Location and power are dconf system defaults (not locked)
 from the `preferences` role (`location.yaml`, `power.yaml`). A timezone
-change restarts the daily wake timer (#2).
+change restarts the daily wake timer (#1).
 
 Done:
 
@@ -216,7 +139,7 @@ Still to do:
   provision wrote the defaults at 15:22, and `gsd-power` kept the
   values it read at login. Not provable after the fact; an app holding
   a sleep inhibitor is the other possibility (`systemd-inhibit --list`
-  while it happens). Being re-tested at the login screen (see #2). If
+  while it happens). Being re-tested at the login screen (see #1). If
   confirmed, note in Setup.md that a session open during provisioning
   needs a log out and back in.
 - [ ] **Users' own values shadow the defaults.** charisis's and
@@ -238,10 +161,10 @@ To re-run on one machine:
 ansible-playbook playbooks/provision.yaml --tags timezone,preferences --limit <host>
 ```
 
-## 7. Syncthing exporter proxy
+## 5. Syncthing exporter proxy
 
 Expose each user's Syncthing metrics to Prometheus, alongside
-node_exporter (#5). Notes for when this is picked up:
+node_exporter (#3). Notes for when this is picked up:
 
 - Syncthing's GUI/API is bound to `127.0.0.1` on a per-user port
   (`syncthing.port` in `group_vars`, e.g. 8384, 8385) with HTTPS, and

@@ -138,6 +138,24 @@ role resizes it and sets it via AccountsService's own dbus call, since
 GNOME's avatar picker enforces a size limit and won't take a raw photo
 straight from a phone.
 
+## Syncthing Ignore Files
+
+Drop `<username>.stignore` into `inventory/group_vars/stignore/` to have
+the `syncthing` role install it as that user's `~/.stignore`, the ignore
+file for their `Home-<username>` share. It's installed **only when the
+user has none yet**, and an existing one is never changed, even if it
+differs: edit it on the machine. Without one, the role warns you not to
+accept that user's share yet, since Syncthing's own state
+(`~/.local/state/syncthing`) and every dotfile would get synced. See
+`inventory.example/group_vars/stignore/` for an example.
+
+The role doesn't create any Syncthing folders (no default `~/Sync`
+either). Each user's `Home-<username>` folder is shared in from another
+device and accepted by hand in that user's Syncthing GUI. When
+accepting, first check `~/.stignore` is in place, then change the
+suggested path (usually `~/Home-<username>`) to `~` so it syncs the home
+folder itself.
+
 ## Secrets (ansible-vault)
 
 Nothing in the repo is currently vaulted (user passwords are handled
