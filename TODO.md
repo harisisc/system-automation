@@ -38,6 +38,7 @@ suspend.
 To re-run just this role on one machine:
 
 ```sh
+cd ansible
 ansible-playbook playbooks/provision.yaml --tags rtcwake --limit <host>
 ```
 
@@ -63,7 +64,7 @@ machine was already awake.
 
 ## 2. preferences role: editor and gitconfig tasks aren't wired in
 
-`roles/preferences/tasks/main.yaml` only imports `location.yaml`.
+`ansible/roles/preferences/tasks/main.yaml` only imports `location.yaml`.
 `editor.yaml` (vim as default editor, `EDITOR`/`VISUAL` in
 `/etc/profile.d`) and `git.yaml` (a `~/.gitconfig` from each user's
 `git:` entry in `group_vars`, needs `user`, `git_user_name` and
@@ -82,7 +83,7 @@ roles, or drop them. Things to look at first:
 
 ## 3. Prometheus: scrape node_exporter and alert on disk usage
 
-node_exporter is installed by `roles/node_exporter` on hosts with
+node_exporter is installed by `ansible/roles/node_exporter` on hosts with
 `node_exporter_enabled: true` in `host_vars` (running on `testbox`). The
 rest happens on the Prometheus side, on `conglomerate`:
 
@@ -158,6 +159,7 @@ Still to do:
 To re-run on one machine:
 
 ```sh
+cd ansible
 ansible-playbook playbooks/provision.yaml --tags timezone,preferences --limit <host>
 ```
 

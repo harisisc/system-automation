@@ -9,7 +9,7 @@ Not covered here — deliberately out of scope for a clean install:
 
 - **`preferences`' per-user editor/gitconfig tasks** — provision only
   runs its machine-wide part (location services) so far (see
-  [`ansible/TODO.md`](ansible/TODO.md#2-preferences-role-editor-and-gitconfig-tasks-arent-wired-in)).
+  [`TODO.md`](TODO.md#2-preferences-role-editor-and-gitconfig-tasks-arent-wired-in)).
 
 ## 0. One-time prerequisites (skip if already done)
 
