@@ -1,0 +1,12 @@
+---
+# Opt-in per host: set node_exporter_enabled: true in host_vars (or
+# group_vars). Setting it back to false removes the package and its
+# firewall rule.
+node_exporter_enabled: false
+
+node_exporter_port: 9100
+
+# Who may scrape it. Prometheus runs on conglomerate and scrapes over
+# Tailscale, so the default is the whole tailnet range. Set this to
+# conglomerate's Tailscale IP (e.g. "100.x.y.z") to allow only it.
+node_exporter_allow_from: "{{ ufw_tailscale_cidr | default('100.64.0.0/10') }}"

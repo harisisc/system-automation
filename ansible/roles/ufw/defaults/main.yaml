@@ -1,0 +1,18 @@
+---
+# Source ranges used by the rules below.
+ufw_lan_cidr: "192.168.1.0/24"
+# Tailscale's address range (CGNAT). Every tailnet device has an address in it.
+ufw_tailscale_cidr: "100.64.0.0/10"
+
+# Incoming traffic allowed. Everything else incoming is denied; outgoing
+# is allowed. Each rule: port, proto (tcp/udp), from (CIDR), comment.
+# Only what the machine itself needs lives here. Apps open their own
+# ports from their roles (e.g. roles/syncthing/tasks/firewall.yaml).
+ufw_rules:
+  - { port: "22", proto: tcp, from: "{{ ufw_lan_cidr }}", comment: "SSH from LAN" }
+  - { port: "22", proto: tcp, from: "{{ ufw_tailscale_cidr }}", comment: "SSH from Tailscale" }
+  - { port: "5353", proto: udp, from: "{{ ufw_lan_cidr }}", comment: "mDNS (.local names)" }
+
+# Extra rules for specific hosts or groups, same format, added on top of
+# ufw_rules. Set in host_vars/group_vars instead of overriding ufw_rules.
+ufw_rules_extra: []

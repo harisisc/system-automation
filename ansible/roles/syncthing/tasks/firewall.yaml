@@ -1,0 +1,23 @@
+---
+# Open Syncthing's sync and local discovery ports to the LAN. Connections
+# through relays or across the internet are outgoing and need no rule.
+# Assumes ufw is installed (the ufw role runs earlier in provision.yaml);
+# rules take effect whenever ufw is enabled. Machine-wide, so the second
+# and later users in the loop just see "ok".
+#
+# Only 22000 is opened: both users' instances currently default to it,
+# so only one can bind it. See ansible/TODO.md #3.
+- name: Allow Syncthing traffic from the LAN
+  community.general.ufw:
+    rule: allow
+    direction: in
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    from_ip: "{{ syncthing_firewall_from }}"
+    comment: "{{ item.comment }}"
+  loop:
+    - { port: "22000", proto: tcp, comment: "Syncthing sync from LAN" }
+    - { port: "22000", proto: udp, comment: "Syncthing sync (QUIC) from LAN" }
+    - { port: "21027", proto: udp, comment: "Syncthing local discovery" }
+  loop_control:
+    label: "{{ item.comment }}"

@@ -1,0 +1,41 @@
+---
+# Default deny incoming, allow outgoing, with ufw_rules (+ ufw_rules_extra)
+# allowed in. The allow rules, SSH included, are added before ufw is
+# enabled, so enabling it can't cut off Ansible's own connection.
+#
+# Not covered: Docker-published ports bypass ufw (Docker inserts its own
+# iptables rules ahead of ufw's). Publish on 127.0.0.1 to keep them local.
+#
+# Rules are only added, never pruned: removing an entry from the lists
+# doesn't delete the rule from a machine. Use `ufw delete` for that.
+
+- name: Install ufw
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Allow configured incoming traffic
+  community.general.ufw:
+    rule: allow
+    direction: in
+    port: "{{ item.port }}"
+    proto: "{{ item.proto }}"
+    from_ip: "{{ item.from }}"
+    comment: "{{ item.comment }}"
+  loop: "{{ ufw_rules + ufw_rules_extra }}"
+  loop_control:
+    label: "{{ item.comment }}"
+
+- name: Deny incoming traffic by default
+  community.general.ufw:
+    default: deny
+    direction: incoming
+
+- name: Allow outgoing traffic by default
+  community.general.ufw:
+    default: allow
+    direction: outgoing
+
+- name: Enable ufw
+  community.general.ufw:
+    state: enabled

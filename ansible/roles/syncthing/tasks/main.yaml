@@ -15,3 +15,6 @@
 
 - name: Configure Syncthing services
   ansible.builtin.import_tasks: service.yaml
+
+- name: Open Syncthing ports in the firewall
+  ansible.builtin.import_tasks: firewall.yaml

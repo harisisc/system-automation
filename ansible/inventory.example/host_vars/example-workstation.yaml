@@ -13,3 +13,7 @@ apt_packages_extra:
 snap_packages_extra:
   - name: obsidian
     classic: true
+
+# Opt this host in to Prometheus node_exporter (see
+# roles/node_exporter/defaults/main.yaml).
+node_exporter_enabled: true

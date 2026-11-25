@@ -2,3 +2,6 @@
 syncthing_user: ""
 syncthing_port: ""
 syncthing_directory: ""
+# Source range allowed to reach Syncthing's sync/discovery ports. Uses the
+# ufw role's LAN range when that's defined.
+syncthing_firewall_from: "{{ ufw_lan_cidr | default('192.168.1.0/24') }}"

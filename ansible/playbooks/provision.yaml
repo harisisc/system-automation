@@ -2,14 +2,22 @@
   become: true
 
   tasks:
-    # Set first: rtcwake's wake time and other timers are read in the
-    # system timezone. If it changes, re-run set-wake (a handler from the
-    # rtcwake role, imported below) so the armed alarm moves too.
+    # Set first: the daily wake timer and other timers are read in the
+    # system timezone. If it changes, restart the wake timer (a handler
+    # from the rtcwake role, imported below) so its next wake moves too.
     - name: Set system timezone
       community.general.timezone:
         name: "{{ system_timezone }}"
-      notify: Run set-wake
+      notify: Restart wake timer
       tags: [timezone]
+
+    # Firewall: deny incoming except SSH and mDNS from the LAN (SSH also
+    # from Tailscale). App roles below open their own ports (Syncthing).
+    # See roles/ufw/defaults/main.yaml.
+    - name: Configure ufw firewall
+      ansible.builtin.import_role:
+        name: ufw
+      tags: [ufw]
 
     # Machine-wide preferences only (location services). Called without a
     # user, so the role's per-user editor/gitconfig tasks are skipped.
@@ -61,6 +69,13 @@
       ansible.builtin.import_role:
         name: geerlingguy.docker
       tags: [docker]
+
+    # Prometheus node_exporter, opt-in per host (node_exporter_enabled),
+    # with a ufw rule allowing only Prometheus to reach it.
+    - name: Install node_exporter
+      ansible.builtin.import_role:
+        name: node_exporter
+      tags: [node_exporter]
 
     # libvirt/QEMU/GNOME Boxes, and adds libvirt_users to the libvirt
     # group. Skipped on machines that are themselves VMs (nested

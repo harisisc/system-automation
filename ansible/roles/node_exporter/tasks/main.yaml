@@ -1,0 +1,48 @@
+---
+# Prometheus node_exporter from Ubuntu's prometheus-node-exporter
+# package. It listens on all interfaces with no auth; the ufw rule below
+# is what limits who can reach it (ufw denies everything else incoming).
+
+- name: Install node_exporter
+  when: node_exporter_enabled | bool
+  block:
+    # No recommends: skips prometheus-node-exporter-collectors, whose
+    # timers run smartctl/apt checks as root.
+    - name: Install prometheus-node-exporter
+      ansible.builtin.apt:
+        name: prometheus-node-exporter
+        state: present
+        install_recommends: false
+
+    - name: Enable and start node_exporter
+      ansible.builtin.systemd:
+        name: prometheus-node-exporter
+        enabled: true
+        state: started
+
+    - name: Allow Prometheus to scrape node_exporter
+      community.general.ufw:
+        rule: allow
+        direction: in
+        port: "{{ node_exporter_port | string }}"
+        proto: tcp
+        from_ip: "{{ node_exporter_allow_from }}"
+        comment: "node_exporter from Prometheus"
+
+- name: Remove node_exporter
+  when: not (node_exporter_enabled | bool)
+  block:
+    - name: Remove the node_exporter firewall rule
+      community.general.ufw:
+        rule: allow
+        direction: in
+        port: "{{ node_exporter_port | string }}"
+        proto: tcp
+        from_ip: "{{ node_exporter_allow_from }}"
+        comment: "node_exporter from Prometheus"
+        delete: true
+
+    - name: Uninstall prometheus-node-exporter
+      ansible.builtin.apt:
+        name: prometheus-node-exporter
+        state: absent
