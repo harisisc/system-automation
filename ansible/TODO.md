@@ -32,32 +32,66 @@ real merged config, not the fragment alone) or dropping `validate`
 entirely and relying on the restart handler failing loudly if the config
 is actually bad.
 
-## 2. rtcwake only wakes a suspended machine once per boot
+## 2. [IN TESTING] Daily 20:00 wake from suspend (rtcwake)
 
-All workstations are meant to wake at 20:00 every day so Syncthing can
-sync. `set-wake.sh` works out the next 20:00 correctly, but it only runs
-from `set-wake.service` at boot (`WantedBy=multi-user.target`). Resuming
-from suspend doesn't re-run it, and `After=network.target` only orders
-it at boot; it doesn't trigger it when the network comes back. So a
-machine that's suspended instead of rebooted wakes on the first night,
-then never sets another alarm and stays asleep every night after, until
-it's rebooted.
+**Old problem:** `set-wake.sh` ran from `set-wake.service` at boot only,
+so a machine that was suspended rather than rebooted woke on the first
+night and never armed another alarm.
 
-Fix options:
+**New approach:** a systemd timer instead of a script.
+`daily-wake.timer` has `OnCalendar=*-*-* {{ rtcwake_wake_time }}:00`
+(default 20:00, in the system timezone) and `WakeSystem=true`, so the
+kernel programs the RTC alarm for the next run every time the machine
+suspends. The alarm can't get lost between nights. `daily-wake.service`
+only logs "Woke for daily sync". Syncthing is already running and picks
+up once the network is back. Wakes from suspend only, never from
+power-off (fine: laptops are shut down for travel). The role also
+removes the old `set-wake` files and clears the alarm they armed.
 
-- **A.** Keep `set-wake.sh` and add a hook in
-  `/usr/lib/systemd/system-sleep/` that runs it before every suspend.
-- **B.** Replace the script and service with a systemd timer
-  (`OnCalendar=*-*-* 20:00`, `WakeSystem=true`). systemd re-arms the
-  wake on every suspend itself. It only wakes from suspend, never from
-  power-off. Preferred: less code, and nothing is left armed at shutdown.
+**Status:**
 
-Not yet confirmed on a real machine. To check, suspend for a minute
-(`sudo rtcwake -m mem -s 60`), then `journalctl -u set-wake.service`
-should show no new run after resume.
+- [x] Role rewritten and run on `testbox` (timer enabled, next run
+  20:00, old units gone) and on `arnold` (provisioned 2026-11-24 15:22).
+- [x] Timer fires: on `arnold`, "Woke for daily sync" at 20:00:12 on
+  2026-11-24. But `arnold` was awake then (it never suspended, see #7),
+  so this didn't test waking.
+- [ ] **Wake from suspend.** Running now: `arnold` was left at the login
+  screen at 20:09 on 2026-11-24, so it should idle-suspend around 21:10
+  and wake at 20:00 on 2026-11-25. Expect a `suspend entry` around
+  21:10, a `suspend exit` at 20:00:0x, then "Woke for daily sync".
+- [ ] **Second night.** Let it suspend again after the wake and check it
+  wakes the following 20:00 too (the case the old setup failed).
 
-Once fixed, also drop the `util-linux` task (always installed on Ubuntu)
-and `After=network.target` from the role.
+If idle suspend doesn't kick in, test the wake on its own: run
+`sudo systemctl suspend` before 20:00 and leave it. A quicker check:
+set `rtcwake_wake_time` a few minutes ahead, re-run the role, and
+suspend.
+
+To re-run just this role on one machine:
+
+```sh
+ansible-playbook playbooks/provision.yaml --tags rtcwake --limit <host>
+```
+
+To see exactly when it slept, woke and ran (`-o short-iso` for full
+timestamps):
+
+```sh
+# when the timer's service ran (one line per run)
+journalctl -t daily-wake -o short-iso
+
+# when the machine suspended and resumed, this boot
+journalctl -b -o short-iso -g 'PM: suspend (entry|exit)'
+
+# both, in order, since yesterday (across reboots)
+journalctl -o short-iso --since yesterday -g 'PM: suspend (entry|exit)|Woke for daily sync'
+
+# last and next run of the timer
+systemctl list-timers daily-wake.timer
+```
+
+"Woke for daily sync" without a `suspend exit` just before it means the
+machine was already awake.
 
 ## 3. syncthing role follow-ups
 
@@ -66,6 +100,18 @@ no default folder, GUI port/HTTPS, device name, and the
 `syncthing@<user>` service. Folders (`Home-<user>`) are shared in from
 another device and accepted by hand. Still to sort out:
 
+- **Two users' instances both want port 22000.** Each user's
+  `syncthing@<user>` uses the default listen address
+  (`tcp://0.0.0.0:22000` + QUIC), so on a machine with two Syncthing
+  users only one can bind it. The other fails to listen on it or picks
+  something else, and with ufw on, anything other than 22000 is
+  blocked from the LAN, so it falls back to relays. Confirmed on
+  `testbox`: `charisis` got 22000, `aharisis` a random port (34569),
+  which ufw blocks from the LAN. Check with
+  `sudo ss -tulnp | grep syncthing`. Fix: a per-user sync port in
+  `group_vars` (like `syncthing.port` for the GUI), written to
+  `config.xml`'s listen address, and opened by
+  `roles/syncthing/tasks/firewall.yaml` instead of the fixed 22000.
 - **`.stignore` is manual.** Each user's `~/.stignore` is written by
   hand and copied to each machine. Syncthing never syncs it. It's what
   keeps `~/.local/state/syncthing` (private key, config, database) and
@@ -131,80 +177,84 @@ A sleeping machine sends no data, so these don't fire while it's
 suspended. Machines installed before the 100G / + 300G /home layout only
 have `/`.
 
-## 6. Install node_exporter
+## 6. [IN TESTING] Install node_exporter
 
-Install Prometheus `node_exporter` for monitoring. Ubuntu packages it as
-`prometheus-node-exporter`; installing it enables and starts the
-service, so adding it to `apt_packages_list` alone would work, but
-leaves it open (see below). The `prometheus.prometheus` collection also
-has a `node_exporter` role, if more control over version and flags is
-needed.
+Done: `roles/node_exporter`, opt-in per host (`node_exporter_enabled:
+true` in `host_vars`). It installs Ubuntu's `prometheus-node-exporter`
+without recommends (no `prometheus-node-exporter-collectors` timers
+running `smartctl`/apt checks as root), and adds a ufw rule allowing
+9100/tcp only from `node_exporter_allow_from` (default: the Tailscale
+range). Setting it back to false removes the rule and the package.
+Tested on `testbox`: metrics served locally, 9100 blocked from the LAN,
+second run unchanged, disabling cleans up.
 
-**Security concerns:**
+Still to do:
 
-- **Open to the whole network, no auth.** By default it listens on port
-  9100 on every interface. Anyone on the same LAN, or on any network a
-  laptop joins (hotel or café Wi-Fi), can read `/metrics`.
-- **What it reveals.** Not secrets, but useful reconnaissance: hostname,
-  kernel and package versions, mounted filesystems, network interfaces
-  and addresses, running systemd units.
-- **Binding to the Tailscale address is fragile.** node_exporter can
-  start before Tailscale is connected, and then fails to start. Prefer
-  a firewall rule.
-- **Extra collectors come with it.** apt installs recommends, so
-  `prometheus-node-exporter-collectors` is pulled in, with systemd
-  timers running things like `smartctl` and apt checks as root. Use
-  `install_recommends: false` unless those metrics are wanted.
-- **Every host running it is another listening service** to keep
-  patched and firewalled.
+- **Scrape it from Prometheus on `conglomerate`.** Needs the host on
+  Tailscale (`sudo tailscale up`), then the host's Tailscale name/IP and
+  port 9100 added as a target in Prometheus.
+- **Narrow `node_exporter_allow_from`** to conglomerate's Tailscale IP
+  instead of the whole tailnet range.
+- **Disk usage alerts (#5)** build on this.
+- Machines suspend nightly (#7 power settings), so a "host down" alert
+  has to allow for expected sleep.
 
-**Plan:**
-
-- A small `node_exporter` role, opt-in per host
-  (`node_exporter_enabled: true` in `host_vars`).
-- ufw rule allowing 9100 only from Tailscale (`100.64.0.0/10`), and
-  scrape over Tailscale, so it doesn't matter which network a machine
-  is on.
-- Start with always-on machines (desktops, KVM hosts). Leave laptops
-  out until there's a reason.
-
-Prometheus and Grafana already run elsewhere. Disk usage alerts (#5)
-build on this. Machines suspend nightly (#7 power settings), so a "host
-down" alert has to allow for expected sleep.
+Security notes, for reference: node_exporter has no auth and listens on
+all interfaces, so the ufw rule is the only thing limiting access. The
+metrics reveal hostname, kernel and package versions, filesystems,
+network interfaces and running units. Binding it to the Tailscale
+address instead is fragile (it can start before Tailscale and fail).
 
 ## 7. [IN TESTING] System-wide settings: timezone, location, power
 
-Implemented, not yet tested on a real machine:
+Timezone is the first task in `provision.yaml` (tag `timezone`,
+`system_timezone` in `group_vars`) and `timezone:` in the autoinstall
+templates. Location and power are dconf system defaults (not locked)
+from the `preferences` role (`location.yaml`, `power.yaml`). A timezone
+change restarts the daily wake timer (#2).
 
-- **Timezone.** Fixed `America/New_York` everywhere: `system_timezone`
-  in `group_vars`, set by the first task in `provision.yaml` (tag
-  `timezone`), and `timezone:` in the autoinstall template. A change
-  re-runs rtcwake's `Run set-wake` handler so the armed alarm moves.
-- **Location services.** Enabled by default (not locked) via dconf in
-  the `preferences` role (`location.yaml`).
-- **Power.** Via dconf in the `preferences` role (`power.yaml`): screen
-  off after 5 min, suspend after 15 min idle on battery and 1 hour on
-  AC. After rtcwake's 20:00 wake (#2), Syncthing gets about an hour on
-  AC before the machine sleeps again.
+Done:
 
-To test on one machine:
+- [x] Timezone set to `America/New_York`: verified on `testbox` and on
+  `arnold` (times shown in EST).
+- [x] dconf profile and `local.d` keyfiles installed and compiled
+  (`dconf update`) on `testbox` and `arnold`.
+- [x] Power defaults take effect: on `arnold`, `gsettings` for
+  charisis, aharisis **and the GDM login screen** shows suspend after
+  3600s on AC / 900s on battery, screen off after 300s. (The login
+  screen does pick these up, contrary to what was assumed earlier.)
+- [x] Screen blanks and locks after 5 min idle (`arnold`, 2026-11-24).
+- [x] Second provision run reports no changes for these tasks.
+
+Still to do:
+
+- [ ] **Idle suspend didn't happen.** On 2026-11-24, `arnold` sat in
+  charisis's desktop session idle from about 15:30 to 20:09 and never
+  suspended. Likely cause: that session started at 15:10, before
+  provision wrote the defaults at 15:22, and `gsd-power` kept the
+  values it read at login. Not provable after the fact; an app holding
+  a sleep inhibitor is the other possibility (`systemd-inhibit --list`
+  while it happens). Being re-tested at the login screen (see #2). If
+  confirmed, note in Setup.md that a session open during provisioning
+  needs a log out and back in.
+- [ ] **Users' own values shadow the defaults.** charisis's and
+  aharisis's user dconf on `arnold` hold the same power keys
+  (`dconf dump /org/gnome/settings-daemon/plugins/power/`). They match
+  today, but a later change to `power.yaml` wouldn't reach them. Decide
+  whether to `dconf reset` those keys, lock them (`locks/`), or leave
+  them.
+- [ ] Location services: check `gsettings get org.gnome.system.location
+  enabled` is `true` as a user.
+- [ ] Fresh install from a rebuilt ISO comes up in `America/New_York`.
+- [ ] Left for later: regional formats (`locale`), lid behaviour,
+  automatic timezone on laptops only, and moving the timezone task into
+  the `preferences` role.
+
+To re-run on one machine:
 
 ```sh
 ansible-playbook playbooks/provision.yaml --tags timezone,preferences --limit <host>
 ```
-
-- `timedatectl` shows `America/New_York`, and
-  `date -d @$(cat /sys/class/rtc/rtc0/wakealarm)` shows 20:00 local.
-- As a user on that machine, `gsettings get org.gnome.system.location
-  enabled` is `true`, and `gsettings get
-  org.gnome.settings-daemon.plugins.power sleep-inactive-ac-timeout` is
-  `3600`.
-- A fresh install from a rebuilt ISO comes up in `America/New_York`.
-
-Left for later: regional formats (`locale`), lid behaviour, the login
-screen's own power settings (GDM has its own dconf profile, so these
-defaults don't apply there), automatic timezone on laptops only, and
-moving the timezone task into the `preferences` role.
 
 ## 8. Syncthing exporter proxy
 
@@ -225,14 +275,3 @@ node_exporter (#6). Notes for when this is picked up:
 - Same exposure concern as node_exporter: bind to the Tailscale
   address or firewall it, since the API key grants full control of
   that user's Syncthing.
-
-## 9. Avatar tasks report "changed" on every run
-
-The avatar part of the `users` role resizes each user's picture on the
-control machine, uploads it, and calls AccountsService's `SetIconFile`
-on every run, all marked changed (`changed_when: true` / temp files). So
-a provision run with nothing to do still shows 5 changed tasks
-(confirmed on `testbox`). Only set the icon when it actually differs,
-e.g. compare a checksum of the resized image with the one recorded last
-time, or with the file AccountsService already holds under
-`/var/lib/AccountsService/icons/<user>`.

@@ -156,15 +156,18 @@ now (and drop an optional `<username>.png` avatar into
 ## 4. Run bootstrap.yaml
 
 Creates the configured user accounts, fully patches the system, sets a
-real hostname, and installs (but doesn't authenticate) Tailscale:
+real hostname, and installs Tailscale (and connects it, if you give it an
+auth key):
 
 ```sh
 cd ansible
 ansible-playbook playbooks/bootstrap.yaml --limit 192.168.1.91
 ```
 
-Prompts for the machine's hostname and a shared initial password for the
-configured accounts. That password isn't stored anywhere and each
+Prompts for the machine's hostname, a shared initial password for the
+configured accounts, and an optional Tailscale auth key (generate one as
+in step 7 first if you want to connect it now; press Enter to skip). That
+password isn't stored anywhere and each
 account is forced to change it at first login. It then shows the target
 and asks you to type the new hostname again before changing anything,
 and refuses any machine that isn't freshly installed. See
@@ -211,7 +214,8 @@ for the optional unlock-test step.
 
 ## 7. Connect Tailscale
 
-Generate a single-use auth key from the
+Skip this if you gave bootstrap an auth key in step 4 (check with
+`tailscale status`). Otherwise, generate a single-use auth key from the
 [admin console](https://login.tailscale.com/admin/settings/keys) →
 **Generate auth key...**, with **Reusable** off, **Ephemeral** off,
 **Pre-approved** on (if shown), **Expiration** 90 days. Then on the
@@ -235,11 +239,14 @@ workstations:
 
 ## 9. Run provision.yaml
 
-Sets the system timezone (`system_timezone` in `group_vars`), enables
+Sets the system timezone (`system_timezone` in `group_vars`), turns on
+the ufw firewall (incoming denied except SSH from LAN and Tailscale, and
+Syncthing and mDNS from LAN), enables
 location services and sets power defaults (screen off after 5 min;
 suspend after 15 min on battery, 1 hour on AC), installs
 the curated apt/snap package lists, rtcwake, Syncthing, Docker
-(engine + group membership), KVM/libvirt (skipped when the machine is
+(engine + group membership), node_exporter (only on hosts with
+`node_exporter_enabled: true`), KVM/libvirt (skipped when the machine is
 itself a VM), and sets avatars/group membership for
 configured users:
 

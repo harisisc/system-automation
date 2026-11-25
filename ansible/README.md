@@ -69,8 +69,8 @@ Run once against a freshly autoinstalled machine, in order: creates
 configured user accounts, fully patches the system (apt/snap/flatpak, so
 everything after this lands on a current base rather than whatever the
 ISO snapshot shipped with), sets a real hostname, and installs Tailscale
-(left unauthenticated — run `sudo tailscale up` on the machine yourself
-afterward). Deliberately doesn't install the curated apt/snap package
+(connected with an auth key if you give one at the prompt, otherwise left
+unauthenticated for you to connect by hand). Deliberately doesn't install the curated apt/snap package
 lists (`apt_packages`, `snap_packages`) — that's `provision.yaml`'s job,
 once this host is promoted to `workstations`. Targets exactly one host
 at a time:
@@ -97,8 +97,9 @@ Tagged the same way as `provision.yaml`, by concern (`users`,
 `system_update`, `hostname`, `tailscale`), if you want to re-run just one
 step.
 
-It prompts for two things each run: the machine's hostname, and a shared
-initial password for the configured accounts. That password isn't stored
+It prompts for three things each run: the machine's hostname, a shared
+initial password for the configured accounts, and an optional Tailscale
+auth key (see below). That password isn't stored
 anywhere — it's typed fresh every run and immediately hashed on the fly —
 and each account is forced to change it at first login (`passwd --expire`),
 so it only needs to work long enough for someone to log in once and set
@@ -106,8 +107,13 @@ their own. Nothing about a user's real password ever lives in this repo.
 
 ### Connect to Tailscale
 
-Tailscale itself is installed but left unauthenticated. Generate an auth
-key from the [admin console](https://login.tailscale.com/admin/settings/keys) →
+Bootstrap always installs Tailscale. To connect it in the same run, paste
+an auth key at the "Tailscale auth key" prompt: bootstrap runs
+`tailscale up --accept-routes` with it after setting the hostname, so the
+machine joins under its new name, and the key is hidden from the output.
+Press Enter instead to skip, and connect it yourself afterwards (below).
+Either way, generate the key from the
+[admin console](https://login.tailscale.com/admin/settings/keys) →
 **Generate auth key...**, with:
 
 - **Reusable** — off (single-use only)
@@ -117,7 +123,7 @@ key from the [admin console](https://login.tailscale.com/admin/settings/keys) �
   appears if device approval is enabled on your tailnet)
 - **Expiration** — 90 days
 
-Then, on the machine itself:
+If you skipped the prompt, run this on the machine itself:
 
 ```sh
 sudo tailscale up --accept-routes --auth-key=tskey-auth-XXXXXXXXXXXX-XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
@@ -170,8 +176,8 @@ For the regular maintenance pass (apt/snap/flatpak upgrades), run the
 ansible-playbook playbooks/run_role.yaml -e role_name=system_update --limit workstations
 ```
 
-`provision.yaml`'s tasks are tagged by concern (`timezone`, `preferences`, `users`, `apt_packages`,
-`snap_packages`, `docker`, `rtcwake`, `syncthing`, `kvmhosts`), so you
+`provision.yaml`'s tasks are tagged by concern (`timezone`, `ufw`, `preferences`, `users`, `apt_packages`,
+`snap_packages`, `docker`, `rtcwake`, `syncthing`, `node_exporter`, `kvmhosts`), so you
 can run a slice of it without touching the rest — e.g. to pick up a new
 user you just added to `group_vars/all.yaml` without re-running everything
 else:

@@ -15,6 +15,15 @@
       prompt: "Initial password for user accounts (forced to change at first login)"
       private: true
       confirm: true
+    # Optional. A one-off auth key from
+    # https://login.tailscale.com/admin/settings/keys connects the machine
+    # to the tailnet during bootstrap. Left empty, Tailscale is only
+    # installed and you run `sudo tailscale up` on the machine yourself.
+    # (An OAuth client key, tskey-client-..., also needs tailscale_tags.)
+    - name: tailscale_authkey
+      prompt: "Tailscale auth key (optional, press Enter to skip and run 'sudo tailscale up' yourself)"
+      private: true
+      default: ""
 
   # Guards against bootstrapping the wrong machine. Everything here runs
   # before any change is made.
@@ -118,6 +127,18 @@
       when: "'ubuntu' not in users | map(attribute='username') | list"
       tags: [users]
 
+    # userdel doesn't touch AccountsService's own records, so its entry
+    # (and picture, if any) would be left behind. Harmless, just clutter.
+    - name: Remove the Ubuntu installer user's AccountsService records
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /var/lib/AccountsService/users/ubuntu
+        - /var/lib/AccountsService/icons/ubuntu
+      when: "'ubuntu' not in users | map(attribute='username') | list"
+      tags: [users]
+
     - name: Set hostname
       ansible.builtin.hostname:
         name: "{{ target_hostname }}"
@@ -131,11 +152,34 @@
         state: present
       tags: [hostname]
 
-    # Installs Tailscale but leaves it unauthenticated - run `sudo tailscale
-    # up` on the machine yourself to connect it to your tailnet.
+    # Installs Tailscale, and connects it with tailscale_authkey if one was
+    # given at the prompt (the role hides the key from the output). Runs
+    # after the hostname change, so the machine joins the tailnet under its
+    # new name. Without a key it's left unauthenticated: run
+    # `sudo tailscale up` on the machine yourself.
     - name: Install Tailscale
       ansible.builtin.import_role:
         name: artis3n.tailscale.machine
       vars:
-        tailscale_up_skip: true
+        tailscale_up_skip: "{{ tailscale_authkey | trim | length == 0 }}"
+        tailscale_args: "--accept-routes"
+      tags: [tailscale]
+
+    # Read-only, so it runs for real even under --check.
+    - name: Check whether Tailscale is connected
+      ansible.builtin.command: tailscale status --json
+      register: bootstrap_tailscale_status
+      check_mode: false
+      changed_when: false
+      failed_when: false
+      tags: [tailscale]
+
+    - name: Remind to connect Tailscale by hand
+      ansible.builtin.debug:
+        msg: >-
+          Tailscale is installed but not connected. On the machine, run
+          `sudo tailscale up` and open the login link it prints.
+      when: >-
+        (bootstrap_tailscale_status.stdout | default('{}', true) | from_json).BackendState
+        | default('') != 'Running'
       tags: [tailscale]
