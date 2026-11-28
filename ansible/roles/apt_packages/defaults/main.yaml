@@ -16,3 +16,5 @@ apt_packages_list:
   - openssh-server
   - jq
   - gparted
+  - vlc
+  - cifs-utils
